@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Prototipo WebAR – Modelo 3D</title>
+    <!-- Carga model-viewer (Web Components) -->
+    <script type="module" src="https://unpkg.com/@google/model-viewer@^4.0.0/dist/model-viewer.min.js"></script>
+
+    <style>
+      html, body { height: 100%; margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+      .wrap { display: grid; place-items: center; height: 100%; background: #0b0c10; color: #e6e6e6; }
+      header { position: fixed; top: 0; left: 0; right: 0; padding: 10px 14px; backdrop-filter: blur(6px); color: #cfcfcf; font-size: 14px; }
+      model-viewer { width: min(100vw, 800px); height: min(80vh, 70vw); background: radial-gradient(400px 400px at 50% 30%, #1a1c24, #0b0c10 70%); border-radius: 16px; }
+      .hint { margin-top: 10px; font-size: 14px; opacity: .8; text-align: center; }
+      .footer { position: fixed; bottom: 10px; left: 0; right: 0; text-align: center; font-size: 12px; opacity: .7; }
+      /* Estiliza el botón AR nativo de model-viewer */
+      model-viewer::part(ar-button) { background: #ffffff10; border: 1px solid #ffffff30; padding: 10px 14px; border-radius: 10px; font-weight: 600; }
+      model-viewer::part(progress-bar) { height: 4px; background: #ffffff20; }
+      model-viewer::part(slider) { background: #e6e6e6; }
+    </style>
+  </head>
+  <body>
+    <header>
+      Prototipo WebAR: escanea un QR que apunte a esta página. Toca «Ver en AR» en tu móvil.
+    </header>
+
+    <!--
+      Coloca tus archivos en la misma carpeta:
+        - model.glb   (Android/Web)
+        - model.usdz  (iOS Quick Look)
+      Reemplaza los nombres abajo si usas otros.
+    -->
+
+    <div class="wrap">
+      <model-viewer
+        id="viewer"
+        src="covid.glb"
+        alt="Modelo 3D"
+        camera-controls
+        auto-rotate
+        autoplay
+        ar
+        ar-modes="webxr scene-viewer quick-look"
+        shadow-intensity="0.8"
+        exposure="1.0"
+        environment-image="legacy"
+        touch-action="pan-y"
+        interaction-prompt="auto"
+        poster=""
+      >
+        <div slot="progress-bar"></div>
+        <button slot="ar-button">Ver en AR</button>
+      </model-viewer>
+
+      <div class="hint">Gira con un dedo • Zoom con gesto de pinza • Arrastra con dos dedos para orbitas suaves</div>
+    </div>
+
+    <div class="footer">Compatibilidad AR: Android (ARCore) / iOS (ARKit). En desktop se muestra el visor 3D sin AR.</div>
+
+    <script>
+      // Opcional: mensajes de carga
+      const v = document.getElementById('viewer');
+      v.addEventListener('load', () => console.log('Modelo cargado')); 
+      v.addEventListener('error', (e) => console.error('Error al cargar el modelo', e));
+    </script>
+  </body>
+</html>
