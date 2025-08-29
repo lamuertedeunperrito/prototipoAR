@@ -6,8 +6,29 @@
     <title>WebAR con MindAR – Image Tracking (covid.glb + targets.mind)</title>
 
     <!-- A-Frame + MindAR (image tracking en navegador móvil, sin apps extra) -->
-    <script src="https://cdn.jsdelivr.net/npm/aframe@1.5.0/dist/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+    <!-- 1) Carga A-Frame desde CDNJS (más confiable en algunos ISP) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.5.0/aframe.min.js"></script>
+<!-- 1b) Fallback opcional a unpkg si el anterior falla -->
+<script>
+  if(!window.AFRAME){
+    var s=document.createElement('script');
+    s.src='https://unpkg.com/aframe@1.5.0/dist/aframe.min.js';
+    document.head.appendChild(s);
+  }
+</script>
+
+<!-- 2) Luego MindAR (depende de A-Frame). Esperamos a que AFRAME exista -->
+<script>
+  function loadMindAR(){
+    var s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js';
+    document.head.appendChild(s);
+  }
+  (function waitForAF(){
+    if(window.AFRAME){ loadMindAR(); }
+    else { setTimeout(waitForAF, 50); }
+  })();
+</script>
 
     <style>
       html,body{margin:0;height:100%;}
