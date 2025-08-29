@@ -3,66 +3,94 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Prototipo WebAR – Modelo 3D</title>
-    <!-- Carga model-viewer (Web Components) -->
-    <script type="module" src="https://unpkg.com/@google/model-viewer@^4.0.0/dist/model-viewer.min.js"></script>
+    <title>WebAR con MindAR – Image Tracking</title>
+
+    <!-- A-Frame + MindAR (image tracking en navegador móvil, sin apps extra) -->
+    <script src="https://cdn.jsdelivr.net/npm/aframe@1.5.0/dist/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
     <style>
-      html, body { height: 100%; margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
-      .wrap { display: grid; place-items: center; height: 100%; background: #0b0c10; color: #e6e6e6; }
-      header { position: fixed; top: 0; left: 0; right: 0; padding: 10px 14px; backdrop-filter: blur(6px); color: #cfcfcf; font-size: 14px; }
-      model-viewer { width: min(100vw, 800px); height: min(80vh, 70vw); background: radial-gradient(400px 400px at 50% 30%, #1a1c24, #0b0c10 70%); border-radius: 16px; }
-      .hint { margin-top: 10px; font-size: 14px; opacity: .8; text-align: center; }
-      .footer { position: fixed; bottom: 10px; left: 0; right: 0; text-align: center; font-size: 12px; opacity: .7; }
-      /* Estiliza el botón AR nativo de model-viewer */
-      model-viewer::part(ar-button) { background: #ffffff10; border: 1px solid #ffffff30; padding: 10px 14px; border-radius: 10px; font-weight: 600; }
-      model-viewer::part(progress-bar) { height: 4px; background: #ffffff20; }
-      model-viewer::part(slider) { background: #e6e6e6; }
+      html,body{margin:0;height:100%;}
+      #ui {position: fixed; top: 12px; left: 12px; right: 12px; z-index: 2; display:flex; gap:8px; align-items:center; font: 14px/1.3 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;}
+      #ui .chip{background:#00000090;color:#fff;padding:8px 10px;border-radius:10px;backdrop-filter: blur(6px);}      
+      #help{position: fixed; bottom: 12px; left: 12px; right: 12px; z-index: 2; text-align:center; color:#fff; opacity:.85; font: 13px/1.35 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;}
     </style>
   </head>
   <body>
-    <header>
-      Prototipo WebAR: escanea un QR que apunte a esta página. Toca «Ver en AR» en tu móvil.
-    </header>
-
-    <!--
-      Coloca tus archivos en la misma carpeta:
-        - model.glb   (Android/Web)
-        - model.usdz  (iOS Quick Look)
-      Reemplaza los nombres abajo si usas otros.
-    -->
-
-    <div class="wrap">
-      <model-viewer
-        id="viewer"
-        src="covid.glb"
-        alt="Modelo 3D"
-        camera-controls
-        auto-rotate
-        autoplay
-        ar
-        ar-modes="webxr scene-viewer quick-look"
-        shadow-intensity="0.8"
-        exposure="1.0"
-        environment-image="legacy"
-        touch-action="pan-y"
-        interaction-prompt="auto"
-        poster=""
-      >
-        <div slot="progress-bar"></div>
-        <button slot="ar-button">Ver en AR</button>
-      </model-viewer>
-
-      <div class="hint">Gira con un dedo • Zoom con gesto de pinza • Arrastra con dos dedos para orbitas suaves</div>
+    <div id="ui">
+      <div class="chip">Apunta la cámara al <b>marcador impreso</b></div>
+      <div class="chip">Toca y arrastra para girar • Pinza para zoom</div>
     </div>
 
-    <div class="footer">Compatibilidad AR: Android (ARCore) / iOS (ARKit). En desktop se muestra el visor 3D sin AR.</div>
+    <!--
+      Coloca estos archivos en la raíz del repo (misma carpeta de este index.html):
+        - model.glb        → tu modelo 3D
+        - myTarget.mind    → archivo del marcador generado con MindAR
+        - marker.png/jpg   → la imagen del marcador que vas a imprimir
+      Tip: si cambias los nombres, actualízalos abajo.
+    -->
+
+    <a-scene
+      mindar-image="imageTargetSrc: ./targets.mind; filterMinCF:0.0001; filterBeta:0.001"
+      vr-mode-ui="enabled:false"
+      device-orientation-permission-ui="enabled:true"
+      renderer="colorManagement:true; physicallyCorrectLights:true"
+      embedded
+    >
+      <a-assets>
+        <a-asset-item id="m" src="./covid.glb"></a-asset-item>
+      </a-assets>
+
+      <!-- Luces básicas -->
+      <a-entity light="type: ambient; intensity: 1"></a-entity>
+      <a-entity light="type: directional; intensity: 0.9" position="1 1 1"></a-entity>
+
+      <!-- targetIndex: 0 corresponde a la 1ª imagen de myTarget.mind -->
+      <a-entity id="anchor" mindar-image-target="targetIndex: 0">
+        <!-- Ajusta escala/posición/rotación a tu marcador físico -->
+        <a-gltf-model id="model" src="#m" position="0 0 0" rotation="0 0 0" scale="0.2 0.2 0.2"></a-gltf-model>
+      </a-entity>
+
+      <a-camera position="0 0 0"></a-camera>
+    </a-scene>
+
+    <div id="help">Si no aparece, mueve la cámara, evita brillos, y acerca el marcador al centro. Marcador recomendado mate y con alto contraste.</div>
 
     <script>
-      // Opcional: mensajes de carga
-      const v = document.getElementById('viewer');
-      v.addEventListener('load', () => console.log('Modelo cargado')); 
-      v.addEventListener('error', (e) => console.error('Error al cargar el modelo', e));
+      // Interacciones básicas: rotación y zoom por gesto
+      (function(){
+        const model = document.getElementById('model');
+        let lastX=0,lastY=0, dragging=false, scale=0.2;
+        const clamp=(v,min,max)=>Math.min(max,Math.max(min,v));
+
+        const canvas = document.querySelector('canvas');
+        const get = (e)=> (e.touches? e.touches[0]: e);
+
+        canvas.addEventListener('pointerdown', e=>{ dragging=true; lastX=e.clientX; lastY=e.clientY;});
+        canvas.addEventListener('pointerup',   ()=> dragging=false);
+        canvas.addEventListener('pointermove', e=>{
+          if(!dragging) return;
+          const dx = e.clientX - lastX; const dy = e.clientY - lastY;
+          lastX = e.clientX; lastY = e.clientY;
+          const r = model.getAttribute('rotation');
+          model.setAttribute('rotation', {x: r.x + dy*0.2, y: r.y + dx*0.3, z: r.z});
+        });
+
+        let lastDist=0;
+        window.addEventListener('touchmove', e=>{
+          if(e.touches.length===2){
+            const [a,b]=e.touches; const dx=a.clientX-b.clientX, dy=a.clientY-b.clientY;
+            const dist=Math.hypot(dx,dy);
+            if(lastDist){
+              const delta = (dist-lastDist)/5000; // sensibilidad
+              scale = clamp(scale + delta, 0.05, 2.5);
+              model.setAttribute('scale', `${scale} ${scale} ${scale}`);
+            }
+            lastDist=dist;
+          }
+        }, {passive:true});
+        window.addEventListener('touchend', ()=>{ lastDist=0; });
+      })();
     </script>
   </body>
 </html>
