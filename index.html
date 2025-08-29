@@ -5,53 +5,53 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>WebAR con MindAR – Image Tracking (covid.glb + targets.mind)</title>
 
-    <!-- A-Frame + MindAR (image tracking en navegador móvil, sin apps extra) -->
-    <!-- 1) Carga A-Frame desde CDNJS (más confiable en algunos ISP) -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.5.0/aframe.min.js"></script>
-<!-- 1b) Fallback opcional a unpkg si el anterior falla -->
-<script>
-  if(!window.AFRAME){
-    var s=document.createElement('script');
-    s.src='https://unpkg.com/aframe@1.5.0/dist/aframe.min.js';
-    document.head.appendChild(s);
-  }
-</script>
+    <!-- 1) A-Frame (CDN principal) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.5.0/aframe.min.js"></script>
+    <!-- 1b) Fallback a unpkg si el anterior falla/capado -->
+    <script>
+      if (!window.AFRAME) {
+        const s = document.createElement('script');
+        s.src = 'https://unpkg.com/aframe@1.5.0/dist/aframe.min.js';
+        document.head.appendChild(s);
+      }
+    </script>
 
-<!-- 2) Luego MindAR (depende de A-Frame). Esperamos a que AFRAME exista -->
-<script>
-  function loadMindAR(){
-    var s=document.createElement('script');
-    s.src='https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js';
-    document.head.appendChild(s);
-  }
-  (function waitForAF(){
-    if(window.AFRAME){ loadMindAR(); }
-    else { setTimeout(waitForAF, 50); }
-  })();
-</script>
+    <!-- 2) Cargar MindAR *solo* cuando AFRAME exista -->
+    <script>
+      function loadMindAR() {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js';
+        s.onload = () => console.log('[MindAR] cargado');
+        s.onerror = () => logLine('❌ No se pudo cargar MindAR (CDN). Revisa conexión/CDN.');
+        document.head.appendChild(s);
+      }
+      (function waitForAF() {
+        if (window.AFRAME) loadMindAR();
+        else setTimeout(waitForAF, 50);
+      })();
+    </script>
 
     <style>
-      html,body{margin:0;height:100%;}
-      #ui {position: fixed; top: 12px; left: 12px; right: 12px; z-index: 2; display:flex; gap:8px; align-items:center; font: 14px/1.3 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;}
-      #ui .chip{background:#00000090;color:#fff;padding:8px 10px;border-radius:10px;backdrop-filter: blur(6px);}      
-      #help{position: fixed; bottom: 12px; left: 12px; right: 12px; z-index: 2; text-align:center; color:#fff; opacity:.85; font: 13px/1.35 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;}
-      .badge {position: fixed; top: 12px; right: 12px; z-index: 3; background:#ffffff15; color:#fff; padding:6px 10px; border-radius:10px; font: 12px/1 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;}
+      html,body{margin:0;height:100%;background:#000;}
+      #ui {position: fixed; top: 12px; left: 12px; right: 12px; z-index: 3; display:flex; gap:8px; align-items:center; font: 14px/1.3 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;}
+      #ui .chip{background:#00000090;color:#fff;padding:8px 10px;border-radius:10px;backdrop-filter: blur(6px);}
+      #help{position: fixed; bottom: 12px; left: 12px; right: 12px; z-index: 3; text-align:center; color:#fff; opacity:.85; font: 13px/1.35 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;}
+      .badge {position: fixed; top: 12px; right: 12px; z-index: 4; background:#ffffff15; color:#fff; padding:6px 10px; border-radius:10px; font: 12px/1 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;}
+      #log { position: fixed; left: 12px; bottom: 56px; right: 12px; z-index: 4; color:#0ff; font:12px/1.3 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap; background:#001014b3; padding:8px 10px; border-radius:10px; max-height: 40vh; overflow:auto; }
+      #loading {position: fixed; inset: 0; z-index: 2; display:grid; place-items:center; color:#fff; font: 15px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; background:linear-gradient(180deg,#000 0%,#0a0f14 100%);}
+      #loading.hidden{display:none;}
     </style>
   </head>
   <body>
     <div id="ui">
       <div class="chip">Apunta la cámara al <b>marcador impreso</b></div>
-      <div class="chip">Toca y arrastra para girar • Pinza para zoom</div>
+      <div class="chip">Toca/arrastra para girar • Pinza para zoom</div>
     </div>
     <div class="badge">MindAR build</div>
+    <div id="loading">Cargando… recuerda permitir la <b>cámara</b></div>
+    <div id="log"></div>
 
-    <!--
-      Archivos esperados en la raíz del repo (misma carpeta que este index.html):
-        - covid.glb        → tu modelo 3D
-        - targets.mind     → archivo del marcador generado con MindAR (desde la misma imagen que imprimirás)
-        - marker.png/jpg   → (opcional) la imagen del marcador para que la gente la descargue/imprima
-    -->
-
+    <!-- 3) Escena A-Frame + MindAR -->
     <a-scene
       mindar-image="imageTargetSrc: ./targets.mind; filterMinCF:0.0001; filterBeta:0.001"
       vr-mode-ui="enabled:false"
@@ -67,7 +67,7 @@
       <a-entity light="type: ambient; intensity: 1"></a-entity>
       <a-entity light="type: directional; intensity: 0.9" position="1 1 1"></a-entity>
 
-      <!-- targetIndex: 0 corresponde a la 1ª imagen dentro de targets.mind -->
+      <!-- targetIndex:0 corresponde a la 1ª imagen incluida en targets.mind -->
       <a-entity id="anchor" mindar-image-target="targetIndex: 0">
         <!-- Ajusta escala/posición/rotación a tu marcador físico -->
         <a-gltf-model id="model" src="#m" position="0 0 0" rotation="0 0 0" scale="0.2 0.2 0.2"></a-gltf-model>
@@ -76,47 +76,90 @@
       <a-camera position="0 0 0"></a-camera>
     </a-scene>
 
-    <div id="help">Si no aparece, mueve la cámara, evita brillos, y acerca el marcador al centro. Marcador recomendado mate y con alto contraste.</div>
+    <div id="help">Si no aparece la cámara: usa Chrome/Safari nativos (no dentro de Instagram), entra por <b>https</b>, quita modo incógnito y permite la cámara.</div>
 
+    <!-- 4) Utilidades de depuración / gestos -->
     <script>
-      // Espera a que A-Frame cree el canvas para adjuntar eventos de gesto
-      document.querySelector('a-scene').addEventListener('loaded', () => {
-        const model  = document.getElementById('model');
+      // Logger visible en pantalla
+      function logLine(msg){
+        const log = document.getElementById('log');
+        const t = new Date().toLocaleTimeString();
+        log.textContent += `[${t}] ${msg}\n`;
+        log.scrollTop = log.scrollHeight;
+        console.log(msg);
+      }
+
+      // Captura errores JS
+      window.addEventListener('error', e => logLine(`❌ JS error: ${e.message}`));
+      window.addEventListener('unhandledrejection', e => logLine(`❌ Promise error: ${e.reason && e.reason.message ? e.reason.message : e.reason}`));
+
+      // Cuando A-Frame cree el canvas, conectamos interacciones y chequeos
+      document.addEventListener('DOMContentLoaded', () => {
+        const scene = document.querySelector('a-scene');
+        const loading = document.getElementById('loading');
         const anchor = document.getElementById('anchor');
-        const canvas = document.querySelector('canvas');
 
-        // Debug: saber si el target se detecta
-        anchor.addEventListener('targetFound', ()=> console.log('🔵 target FOUND'));
-        anchor.addEventListener('targetLost',  ()=> console.log('⚪ target LOST'));
+        // Debug de tracking
+        anchor.addEventListener('targetFound', () => logLine('🔵 target FOUND'));
+        anchor.addEventListener('targetLost',  () => logLine('⚪ target LOST'));
 
-        // Rotación con arrastre
-        let lastX=0,lastY=0, dragging=false;
-        canvas.addEventListener('pointerdown', e=>{ dragging=true; lastX=e.clientX; lastY=e.clientY;});
-        canvas.addEventListener('pointerup',   ()=> dragging=false);
-        canvas.addEventListener('pointermove', e=>{
-          if(!dragging) return;
-          const dx = e.clientX - lastX; const dy = e.clientY - lastY;
-          lastX = e.clientX; lastY = e.clientY;
-          const r = model.getAttribute('rotation');
-          model.setAttribute('rotation', {x: r.x + dy*0.2, y: r.y + dx*0.3, z: r.z});
+        // Señal de cámara activa (A-Frame emite evento webgltextureloaded cuando el vídeo está en uso)
+        scene.addEventListener('loaded', () => {
+          logLine('✅ Escena A-Frame cargada');
+          // Espera a que el canvas exista
+          setTimeout(() => {
+            const canvas = document.querySelector('canvas');
+            if (canvas) {
+              logLine('🎥 Intentando iniciar cámara…');
+              // Ocultar loading cuando detectemos primer frame (práctico)
+              let hid = false;
+              const hideOnce = ()=>{ if(!hid){ loading.classList.add('hidden'); hid=true; logLine('🎬 Cámara activa'); } };
+              canvas.addEventListener('webglcontextrestored', hideOnce);
+              // fallback si no dispara el evento (por si acaso)
+              setTimeout(hideOnce, 1500);
+
+              // Gestos
+              const model = document.getElementById('model');
+              let lastX=0,lastY=0, dragging=false;
+              canvas.addEventListener('pointerdown', e=>{ dragging=true; lastX=e.clientX; lastY=e.clientY;});
+              canvas.addEventListener('pointerup',   ()=> dragging=false);
+              canvas.addEventListener('pointermove', e=>{
+                if(!dragging) return;
+                const dx = e.clientX - lastX; const dy = e.clientY - lastY;
+                lastX = e.clientX; lastY = e.clientY;
+                const r = model.getAttribute('rotation');
+                model.setAttribute('rotation', {x: r.x + dy*0.2, y: r.y + dx*0.3, z: r.z});
+              });
+
+              let lastDist=0; let scale=0.2;
+              const clamp=(v,min,max)=>Math.min(max,Math.max(min,v));
+              window.addEventListener('touchmove', e=>{
+                if(e.touches && e.touches.length===2){
+                  const [a,b]=e.touches; const dx=a.clientX-b.clientX, dy=a.clientY-b.clientY;
+                  const dist=Math.hypot(dx,dy);
+                  if(lastDist){
+                    const delta = (dist-lastDist)/5000;
+                    scale = clamp(scale + delta, 0.05, 2.5);
+                    model.setAttribute('scale', `${scale} ${scale} ${scale}`);
+                  }
+                  lastDist=dist;
+                }
+              }, {passive:true});
+              window.addEventListener('touchend', ()=>{ lastDist=0; });
+            } else {
+              logLine('⚠️ No se encontró el canvas aún.');
+            }
+          }, 300);
         });
 
-        // Zoom con pinza (2 dedos)
-        let lastDist=0; let scale=0.2;
-        const clamp=(v,min,max)=>Math.min(max,Math.max(min,v));
-        window.addEventListener('touchmove', e=>{
-          if(e.touches && e.touches.length===2){
-            const [a,b]=e.touches; const dx=a.clientX-b.clientX, dy=a.clientY-b.clientY;
-            const dist=Math.hypot(dx,dy);
-            if(lastDist){
-              const delta = (dist-lastDist)/5000; // sensibilidad
-              scale = clamp(scale + delta, 0.05, 2.5);
-              model.setAttribute('scale', `${scale} ${scale} ${scale}`);
-            }
-            lastDist=dist;
-          }
-        }, {passive:true});
-        window.addEventListener('touchend', ()=>{ lastDist=0; });
+        // Comprobación de permisos de cámara directa (ayuda a diagnosticar)
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          navigator.mediaDevices.getUserMedia({ video: true })
+            .then(s => { s.getTracks().forEach(t=>t.stop()); logLine('🔓 Permiso de cámara OK'); })
+            .catch(err => logLine(`🔒 Cámara bloqueada: ${err && err.name ? err.name : err}`));
+        } else {
+          logLine('❌ getUserMedia no disponible en este navegador.');
+        }
       });
     </script>
   </body>
