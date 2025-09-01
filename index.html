@@ -1,166 +1,287 @@
 <!doctype html>
 <html lang="es">
-  <head>
+<head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>WebAR con MindAR – Image Tracking (covid.glb + targets.mind)</title>
-
-    <!-- 1) A-Frame (CDN principal) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.5.0/aframe.min.js"></script>
-    <!-- 1b) Fallback a unpkg si el anterior falla/capado -->
-    <script>
-      if (!window.AFRAME) {
-        const s = document.createElement('script');
-        s.src = 'https://unpkg.com/aframe@1.5.0/dist/aframe.min.js';
-        document.head.appendChild(s);
-      }
-    </script>
-
-    <!-- 2) Cargar MindAR *solo* cuando AFRAME exista -->
-    <script>
-      function loadMindAR() {
-        const s = document.createElement('script');
-        s.src = 'https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js';
-        s.onload = () => console.log('[MindAR] cargado');
-        s.onerror = () => logLine('❌ No se pudo cargar MindAR (CDN). Revisa conexión/CDN.');
-        document.head.appendChild(s);
-      }
-      (function waitForAF() {
-        if (window.AFRAME) loadMindAR();
-        else setTimeout(waitForAF, 50);
-      })();
-    </script>
-
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+    <title>WebAR con MindAR – Image Tracking</title>
+    
+    <!-- A-Frame primero -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.4.0/aframe.min.js"></script>
+    
+    <!-- MindAR después de A-Frame -->
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+    
     <style>
-      html,body{margin:0;height:100%;background:#000;}
-      #ui {position: fixed; top: 12px; left: 12px; right: 12px; z-index: 3; display:flex; gap:8px; align-items:center; font: 14px/1.3 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;}
-      #ui .chip{background:#00000090;color:#fff;padding:8px 10px;border-radius:10px;backdrop-filter: blur(6px);}
-      #help{position: fixed; bottom: 12px; left: 12px; right: 12px; z-index: 3; text-align:center; color:#fff; opacity:.85; font: 13px/1.35 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;}
-      .badge {position: fixed; top: 12px; right: 12px; z-index: 4; background:#ffffff15; color:#fff; padding:6px 10px; border-radius:10px; font: 12px/1 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;}
-      #log { position: fixed; left: 12px; bottom: 56px; right: 12px; z-index: 4; color:#0ff; font:12px/1.3 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap; background:#001014b3; padding:8px 10px; border-radius:10px; max-height: 40vh; overflow:auto; }
-      #loading {position: fixed; inset: 0; z-index: 2; display:grid; place-items:center; color:#fff; font: 15px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; background:linear-gradient(180deg,#000 0%,#0a0f14 100%);}
-      #loading.hidden{display:none;}
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            background: #000;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+        
+        #ui {
+            position: fixed;
+            top: 12px;
+            left: 12px;
+            right: 12px;
+            z-index: 1000;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            pointer-events: none;
+        }
+        
+        #ui .chip {
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 16px;
+            font-size: 12px;
+            backdrop-filter: blur(10px);
+        }
+        
+        #help {
+            position: fixed;
+            bottom: 12px;
+            left: 12px;
+            right: 12px;
+            z-index: 1000;
+            text-align: center;
+            color: white;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 12px;
+            border-radius: 12px;
+            font-size: 11px;
+            line-height: 1.4;
+            backdrop-filter: blur(10px);
+        }
+        
+        #loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1001;
+            color: white;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            margin: 0 auto 12px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        a-scene {
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        /* Ocultar controles de A-Frame que no necesitamos */
+        .a-enter-vr {
+            display: none !important;
+        }
     </style>
-  </head>
-  <body>
-    <div id="ui">
-      <div class="chip">Apunta la cámara al <b>marcador impreso</b></div>
-      <div class="chip">Toca/arrastra para girar • Pinza para zoom</div>
+</head>
+<body>
+    <div id="loading">
+        <div class="spinner"></div>
+        <div>Cargando AR...</div>
     </div>
-    <div class="badge">MindAR build</div>
-    <div id="loading">Cargando… recuerda permitir la <b>cámara</b></div>
-    <div id="log"></div>
-
-    <!-- 3) Escena A-Frame + MindAR -->
+    
+    <div id="ui" style="display: none;">
+        <div class="chip">📷 Apunta al marcador impreso</div>
+        <div class="chip">🔄 Toca y arrastra para rotar</div>
+    </div>
+    
     <a-scene
-      mindar-image="imageTargetSrc: ./targets.mind; filterMinCF:0.0001; filterBeta:0.001"
-      vr-mode-ui="enabled:false"
-      device-orientation-permission-ui="enabled:true"
-      renderer="colorManagement:true; physicallyCorrectLights:true"
-      embedded
+        id="arScene"
+        mindar-image="imageTargetSrc: ./targets.mind; maxTrack: 1; warmupTolerance: 5; missTolerance: 5"
+        color-space="sRGB"
+        renderer="colorManagement: true; physicallyCorrectLights: true"
+        vr-mode-ui="enabled: false"
+        device-orientation-permission-ui="enabled: false"
+        loading-screen="enabled: false"
+        embedded
+        style="display: none;"
     >
-      <a-assets>
-        <a-asset-item id="m" src="./covid.glb"></a-asset-item>
-      </a-assets>
+        <a-assets>
+            <a-asset-item id="covidModel" src="./covid.glb"></a-asset-item>
+        </a-assets>
 
-      <!-- Luces básicas -->
-      <a-entity light="type: ambient; intensity: 1"></a-entity>
-      <a-entity light="type: directional; intensity: 0.9" position="1 1 1"></a-entity>
+        <!-- Luces -->
+        <a-light type="ambient" intensity="0.8"></a-light>
+        <a-light type="directional" position="2 4 5" intensity="0.5"></a-light>
 
-      <!-- targetIndex:0 corresponde a la 1ª imagen incluida en targets.mind -->
-      <a-entity id="anchor" mindar-image-target="targetIndex: 0">
-        <!-- Ajusta escala/posición/rotación a tu marcador físico -->
-        <a-gltf-model id="model" src="#m" position="0 0 0" rotation="0 0 0" scale="0.2 0.2 0.2"></a-gltf-model>
-      </a-entity>
+        <!-- Entidad objetivo con el modelo 3D -->
+        <a-entity id="targetEntity" mindar-image-target="targetIndex: 0">
+            <a-gltf-model 
+                id="model3d"
+                src="#covidModel" 
+                position="0 0 0" 
+                rotation="0 0 0" 
+                scale="0.3 0.3 0.3"
+                animation-mixer
+            >
+            </a-gltf-model>
+        </a-entity>
 
-      <a-camera position="0 0 0"></a-camera>
+        <!-- Cámara -->
+        <a-camera 
+            position="0 0 0"
+            look-controls="enabled: false"
+            cursor="rayOrigin: mouse"
+        ></a-camera>
     </a-scene>
 
-    <div id="help">Si no aparece la cámara: usa Chrome/Safari nativos (no dentro de Instagram), entra por <b>https</b>, quita modo incógnito y permite la cámara.</div>
+    <div id="help" style="display: none;">
+        <strong>💡 Consejos:</strong><br>
+        • Usa Chrome o Safari nativo (no Instagram/Facebook)<br>
+        • Asegúrate de estar en HTTPS<br>
+        • Permite acceso a la cámara<br>
+        • Mantén buena iluminación y estabilidad
+    </div>
 
-    <!-- 4) Utilidades de depuración / gestos -->
     <script>
-      // Logger visible en pantalla
-      function logLine(msg){
-        const log = document.getElementById('log');
-        const t = new Date().toLocaleTimeString();
-        log.textContent += `[${t}] ${msg}\n`;
-        log.scrollTop = log.scrollHeight;
-        console.log(msg);
-      }
+        let arScene;
+        let isARStarted = false;
 
-      // Captura errores JS
-      window.addEventListener('error', e => logLine(`❌ JS error: ${e.message}`));
-      window.addEventListener('unhandledrejection', e => logLine(`❌ Promise error: ${e.reason && e.reason.message ? e.reason.message : e.reason}`));
-
-      // Cuando A-Frame cree el canvas, conectamos interacciones y chequeos
-      document.addEventListener('DOMContentLoaded', () => {
-        const scene = document.querySelector('a-scene');
-        const loading = document.getElementById('loading');
-        const anchor = document.getElementById('anchor');
-
-        // Debug de tracking
-        anchor.addEventListener('targetFound', () => logLine('🔵 target FOUND'));
-        anchor.addEventListener('targetLost',  () => logLine('⚪ target LOST'));
-
-        // Señal de cámara activa (A-Frame emite evento webgltextureloaded cuando el vídeo está en uso)
-        scene.addEventListener('loaded', () => {
-          logLine('✅ Escena A-Frame cargada');
-          // Espera a que el canvas exista
-          setTimeout(() => {
-            const canvas = document.querySelector('canvas');
-            if (canvas) {
-              logLine('🎥 Intentando iniciar cámara…');
-              // Ocultar loading cuando detectemos primer frame (práctico)
-              let hid = false;
-              const hideOnce = ()=>{ if(!hid){ loading.classList.add('hidden'); hid=true; logLine('🎬 Cámara activa'); } };
-              canvas.addEventListener('webglcontextrestored', hideOnce);
-              // fallback si no dispara el evento (por si acaso)
-              setTimeout(hideOnce, 1500);
-
-              // Gestos
-              const model = document.getElementById('model');
-              let lastX=0,lastY=0, dragging=false;
-              canvas.addEventListener('pointerdown', e=>{ dragging=true; lastX=e.clientX; lastY=e.clientY;});
-              canvas.addEventListener('pointerup',   ()=> dragging=false);
-              canvas.addEventListener('pointermove', e=>{
-                if(!dragging) return;
-                const dx = e.clientX - lastX; const dy = e.clientY - lastY;
-                lastX = e.clientX; lastY = e.clientY;
-                const r = model.getAttribute('rotation');
-                model.setAttribute('rotation', {x: r.x + dy*0.2, y: r.y + dx*0.3, z: r.z});
-              });
-
-              let lastDist=0; let scale=0.2;
-              const clamp=(v,min,max)=>Math.min(max,Math.max(min,v));
-              window.addEventListener('touchmove', e=>{
-                if(e.touches && e.touches.length===2){
-                  const [a,b]=e.touches; const dx=a.clientX-b.clientX, dy=a.clientY-b.clientY;
-                  const dist=Math.hypot(dx,dy);
-                  if(lastDist){
-                    const delta = (dist-lastDist)/5000;
-                    scale = clamp(scale + delta, 0.05, 2.5);
-                    model.setAttribute('scale', `${scale} ${scale} ${scale}`);
-                  }
-                  lastDist=dist;
-                }
-              }, {passive:true});
-              window.addEventListener('touchend', ()=>{ lastDist=0; });
-            } else {
-              logLine('⚠️ No se encontró el canvas aún.');
+        // Esperar a que todo esté cargado
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM cargado, iniciando AR...');
+            
+            arScene = document.querySelector('#arScene');
+            
+            if (!arScene) {
+                console.error('No se encontró la escena AR');
+                return;
             }
-          }, 300);
+
+            // Eventos de MindAR
+            arScene.addEventListener('renderstart', function() {
+                console.log('MindAR: Render iniciado');
+                hideLoading();
+                showUI();
+            });
+
+            // Cuando se detecta el target
+            const targetEntity = document.querySelector('#targetEntity');
+            if (targetEntity) {
+                targetEntity.addEventListener('targetFound', function() {
+                    console.log('Target encontrado!');
+                    // Opcional: agregar animación cuando se detecta
+                    const model = document.querySelector('#model3d');
+                    if (model) {
+                        model.setAttribute('animation', {
+                            property: 'rotation',
+                            to: '0 360 0',
+                            loop: true,
+                            dur: 10000
+                        });
+                    }
+                });
+
+                targetEntity.addEventListener('targetLost', function() {
+                    console.log('Target perdido');
+                    // Opcional: detener animación
+                    const model = document.querySelector('#model3d');
+                    if (model) {
+                        model.removeAttribute('animation');
+                    }
+                });
+            }
+
+            // Inicializar después de un breve delay
+            setTimeout(initializeAR, 500);
         });
 
-        // Comprobación de permisos de cámara directa (ayuda a diagnosticar)
-        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-          navigator.mediaDevices.getUserMedia({ video: true })
-            .then(s => { s.getTracks().forEach(t=>t.stop()); logLine('🔓 Permiso de cámara OK'); })
-            .catch(err => logLine(`🔒 Cámara bloqueada: ${err && err.name ? err.name : err}`));
-        } else {
-          logLine('❌ getUserMedia no disponible en este navegador.');
+        function initializeAR() {
+            console.log('Inicializando AR...');
+            
+            try {
+                // Mostrar la escena
+                arScene.style.display = 'block';
+                
+                // Forzar inicio si no se ha iniciado automáticamente
+                if (!isARStarted) {
+                    console.log('Forzando inicio de AR...');
+                    isARStarted = true;
+                }
+                
+            } catch (error) {
+                console.error('Error al inicializar AR:', error);
+                showError('Error al inicializar AR: ' + error.message);
+            }
         }
-      });
+
+        function hideLoading() {
+            const loading = document.querySelector('#loading');
+            if (loading) {
+                loading.style.display = 'none';
+            }
+        }
+
+        function showUI() {
+            const ui = document.querySelector('#ui');
+            const help = document.querySelector('#help');
+            
+            if (ui) ui.style.display = 'flex';
+            if (help) help.style.display = 'block';
+        }
+
+        function showError(message) {
+            const loading = document.querySelector('#loading');
+            if (loading) {
+                loading.innerHTML = `
+                    <div style="color: #ff6b6b; font-size: 16px;">❌ Error</div>
+                    <div style="margin-top: 8px; font-size: 12px;">${message}</div>
+                `;
+            }
+        }
+
+        // Manejo de errores globales
+        window.addEventListener('error', function(e) {
+            console.error('Error global:', e.error);
+        });
+
+        // Verificar compatibilidad de dispositivo
+        function checkCompatibility() {
+            const isHTTPS = location.protocol === 'https:' || location.hostname === 'localhost';
+            const hasUserMedia = navigator.mediaDevices && navigator.mediaDevices.getUserMedia;
+            
+            if (!isHTTPS) {
+                showError('Se requiere HTTPS para acceder a la cámara');
+                return false;
+            }
+            
+            if (!hasUserMedia) {
+                showError('Tu navegador no soporta acceso a cámara');
+                return false;
+            }
+            
+            return true;
+        }
+
+        // Verificar compatibilidad al cargar
+        if (!checkCompatibility()) {
+            console.warn('Dispositivo no compatible');
+        }
     </script>
-  </body>
+</body>
 </html>
