@@ -5,6 +5,42 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
     <title>WebAR con MindAR – Image Tracking</title>
     
+    <!-- CARGA SÍNCRONA: A-Frame primero -->
+    <script src="https://unpkg.com/aframe@1.4.0/dist/aframe.min.js"></script>
+    <!-- ESPERA un momento y luego MindAR -->
+    <script>
+        // Función para cargar MindAR solo cuando A-Frame esté 100% listo
+        function loadMindARSafely() {
+            if (typeof AFRAME !== 'undefined' && AFRAME.registerComponent) {
+                console.log('✅ A-Frame confirmado, cargando MindAR...');
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js';
+                script.onload = () => {
+                    console.log('✅ MindAR cargado, inicializando AR...');
+                    window.mindARReady = true;
+                };
+                script.onerror = () => {
+                    console.error('❌ Error cargando MindAR');
+                    // Fallback
+                    const fallbackScript = document.createElement('script');
+                    fallbackScript.src = 'https://unpkg.com/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js';
+                    fallbackScript.onload = () => {
+                        console.log('✅ MindAR cargado (fallback)');
+                        window.mindARReady = true;
+                    };
+                    document.head.appendChild(fallbackScript);
+                };
+                document.head.appendChild(script);
+            } else {
+                console.log('⏳ Esperando A-Frame...');
+                setTimeout(loadMindARSafely, 100);
+            }
+        }
+        
+        // Iniciar carga después de que el script actual termine
+        setTimeout(loadMindARSafely, 100);
+    </script>
+    
     <style>
         html, body {
             margin: 0;
@@ -95,7 +131,7 @@
 <body>
     <div id="loading">
         <div class="spinner"></div>
-        <div id="loadingText">Cargando librerías AR...</div>
+        <div id="loadingText">Inicializando AR...</div>
     </div>
     
     <div id="ui" style="display: none;">
@@ -103,7 +139,43 @@
         <div class="chip">🔄 Toca y arrastra para rotar</div>
     </div>
     
-    <!-- La escena se creará dinámicamente cuando todo esté listo -->
+    <!-- Escena AR estática - se mostrará cuando todo esté listo -->
+    <a-scene
+        id="arScene"
+        mindar-image="imageTargetSrc: ./targets.mind; maxTrack: 1; warmupTolerance: 5; missTolerance: 5"
+        color-space="sRGB"
+        renderer="colorManagement: true; physicallyCorrectLights: true"
+        vr-mode-ui="enabled: false"
+        device-orientation-permission-ui="enabled: false"
+        loading-screen="enabled: false"
+        embedded
+        style="display: none;"
+    >
+        <a-assets>
+            <a-asset-item id="covidModel" src="./covid.glb"></a-asset-item>
+        </a-assets>
+
+        <a-light type="ambient" intensity="0.8"></a-light>
+        <a-light type="directional" position="2 4 5" intensity="0.5"></a-light>
+
+        <a-entity id="targetEntity" mindar-image-target="targetIndex: 0">
+            <a-gltf-model 
+                id="model3d"
+                src="#covidModel" 
+                position="0 0 0" 
+                rotation="0 0 0" 
+                scale="0.3 0.3 0.3"
+                animation-mixer
+            >
+            </a-gltf-model>
+        </a-entity>
+
+        <a-camera 
+            position="0 0 0"
+            look-controls="enabled: false"
+            cursor="rayOrigin: mouse"
+        ></a-camera>
+    </a-scene>
     
     <div id="help" style="display: none;">
         <strong>💡 Consejos:</strong><br>
@@ -114,196 +186,84 @@
     </div>
 
     <script>
-        let loadingText = document.getElementById('loadingText');
-        let scriptsLoaded = { aframe: false, mindar: false };
+        let arScene;
+        let isInitialized = false;
         
+        // Verificar compatibilidad
+        function checkCompatibility() {
+            const isHTTPS = location.protocol === 'https:' || location.hostname === 'localhost';
+            const hasUserMedia = navigator.mediaDevices && navigator.mediaDevices.getUserMedia;
+            
+            if (!isHTTPS) {
+                showError('Se requiere HTTPS para acceder a la cámara');
+                return false;
+            }
+            
+            if (!hasUserMedia) {
+                showError('Tu navegador no soporta acceso a cámara');
+                return false;
+            }
+            
+            return true;
+        }
+
         function updateLoadingText(text) {
+            const loadingText = document.getElementById('loadingText');
             if (loadingText) {
                 loadingText.textContent = text;
             }
             console.log(text);
         }
 
-        function checkAllScriptsLoaded() {
-            if (scriptsLoaded.aframe && scriptsLoaded.mindar) {
-                console.log('Todos los scripts cargados, creando escena...');
-                createARScene();
+        function waitForMindAR() {
+            if (window.mindARReady && !isInitialized) {
+                console.log('🚀 MindAR listo, inicializando AR...');
+                isInitialized = true;
+                initializeAR();
+            } else if (!isInitialized) {
+                console.log('⏳ Esperando MindAR...');
+                setTimeout(waitForMindAR, 200);
             }
         }
 
-        function loadScript(src, onLoad, onError, id) {
-            // Verificar si ya existe
-            if (document.getElementById(id)) {
-                onLoad();
-                return;
-            }
-
-            const script = document.createElement('script');
-            script.id = id;
-            script.src = src;
-            script.onload = onLoad;
-            script.onerror = onError;
-            document.head.appendChild(script);
-        }
-
-        function loadAFrame() {
-            updateLoadingText('Cargando A-Frame...');
+        function initializeAR() {
+            console.log('🎯 Inicializando escena AR...');
+            updateLoadingText('Iniciando cámara...');
             
-            loadScript(
-                'https://cdnjs.cloudflare.com/ajax/libs/aframe/1.4.0/aframe.min.js',
-                function() {
-                    console.log('A-Frame cargado exitosamente');
-                    if (window.AFRAME) {
-                        scriptsLoaded.aframe = true;
-                        updateLoadingText('A-Frame listo, cargando MindAR...');
-                        loadMindAR();
-                    } else {
-                        // Fallback
-                        loadScript(
-                            'https://unpkg.com/aframe@1.4.0/dist/aframe.min.js',
-                            function() {
-                                if (window.AFRAME) {
-                                    scriptsLoaded.aframe = true;
-                                    updateLoadingText('A-Frame listo (fallback), cargando MindAR...');
-                                    loadMindAR();
-                                } else {
-                                    showError('No se pudo cargar A-Frame');
-                                }
-                            },
-                            function() {
-                                showError('Error cargando A-Frame desde ambos CDN');
-                            },
-                            'aframe-fallback'
-                        );
-                    }
-                },
-                function() {
-                    console.error('Error cargando A-Frame desde CDNJS, intentando fallback...');
-                    // Intentar desde unpkg
-                    loadScript(
-                        'https://unpkg.com/aframe@1.4.0/dist/aframe.min.js',
-                        function() {
-                            if (window.AFRAME) {
-                                scriptsLoaded.aframe = true;
-                                updateLoadingText('A-Frame listo (fallback), cargando MindAR...');
-                                loadMindAR();
-                            } else {
-                                showError('No se pudo cargar A-Frame');
-                            }
-                        },
-                        function() {
-                            showError('Error cargando A-Frame desde ambos CDN');
-                        },
-                        'aframe-fallback'
-                    );
-                },
-                'aframe-main'
-            );
-        }
-
-        function loadMindAR() {
-            updateLoadingText('Cargando MindAR...');
-            
-            loadScript(
-                'https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js',
-                function() {
-                    console.log('MindAR cargado exitosamente');
-                    scriptsLoaded.mindar = true;
-                    updateLoadingText('Iniciando AR...');
-                    checkAllScriptsLoaded();
-                },
-                function() {
-                    console.error('Error cargando MindAR, intentando fallback...');
-                    loadScript(
-                        'https://unpkg.com/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js',
-                        function() {
-                            console.log('MindAR cargado desde unpkg');
-                            scriptsLoaded.mindar = true;
-                            updateLoadingText('Iniciando AR...');
-                            checkAllScriptsLoaded();
-                        },
-                        function() {
-                            showError('No se pudo cargar MindAR desde ningún CDN');
-                        },
-                        'mindar-fallback'
-                    );
-                },
-                'mindar-main'
-            );
-        }
-
-        function createARScene() {
-            console.log('Creando escena AR...');
-            
-            const sceneHTML = `
-            <a-scene
-                id="arScene"
-                mindar-image="imageTargetSrc: ./targets.mind; maxTrack: 1; warmupTolerance: 5; missTolerance: 5"
-                color-space="sRGB"
-                renderer="colorManagement: true; physicallyCorrectLights: true"
-                vr-mode-ui="enabled: false"
-                device-orientation-permission-ui="enabled: false"
-                loading-screen="enabled: false"
-                embedded
-            >
-                <a-assets>
-                    <a-asset-item id="covidModel" src="./covid.glb"></a-asset-item>
-                </a-assets>
-
-                <a-light type="ambient" intensity="0.8"></a-light>
-                <a-light type="directional" position="2 4 5" intensity="0.5"></a-light>
-
-                <a-entity id="targetEntity" mindar-image-target="targetIndex: 0">
-                    <a-gltf-model 
-                        id="model3d"
-                        src="#covidModel" 
-                        position="0 0 0" 
-                        rotation="0 0 0" 
-                        scale="0.3 0.3 0.3"
-                        animation-mixer
-                    >
-                    </a-gltf-model>
-                </a-entity>
-
-                <a-camera 
-                    position="0 0 0"
-                    look-controls="enabled: false"
-                    cursor="rayOrigin: mouse"
-                ></a-camera>
-            </a-scene>
-            `;
-
-            // Insertar la escena en el DOM
-            document.body.insertAdjacentHTML('beforeend', sceneHTML);
-            
-            // Configurar eventos después de que la escena se haya insertado
-            setTimeout(setupAREvents, 100);
-        }
-
-        function setupAREvents() {
-            const arScene = document.querySelector('#arScene');
+            arScene = document.querySelector('#arScene');
             
             if (!arScene) {
-                console.error('No se pudo crear la escena AR');
-                showError('Error creando la escena AR');
+                showError('Error: No se encontró la escena AR');
                 return;
             }
 
-            console.log('Configurando eventos AR...');
-
+            // Configurar eventos
             arScene.addEventListener('renderstart', function() {
-                console.log('MindAR: Render iniciado');
-                hideLoading();
-                showUI();
+                console.log('✅ MindAR renderstart - Cámara iniciada');
+                setTimeout(() => {
+                    hideLoading();
+                    showUI();
+                }, 500);
             });
 
+            // Eventos de detección
             const targetEntity = document.querySelector('#targetEntity');
             if (targetEntity) {
                 targetEntity.addEventListener('targetFound', function() {
                     console.log('🎯 Target encontrado!');
                     const model = document.querySelector('#model3d');
                     if (model) {
-                        model.setAttribute('animation', {
+                        // Animación suave al detectar
+                        model.setAttribute('animation__appear', {
+                            property: 'scale',
+                            from: '0.1 0.1 0.1',
+                            to: '0.3 0.3 0.3',
+                            dur: 600,
+                            easing: 'easeOutBack'
+                        });
+                        
+                        // Rotación continua
+                        model.setAttribute('animation__rotate', {
                             property: 'rotation',
                             to: '0 360 0',
                             loop: true,
@@ -316,19 +276,22 @@
                     console.log('❌ Target perdido');
                     const model = document.querySelector('#model3d');
                     if (model) {
-                        model.removeAttribute('animation');
+                        model.removeAttribute('animation__rotate');
                     }
                 });
             }
 
-            // Timeout de seguridad para mostrar UI aunque no se dispare renderstart
-            setTimeout(function() {
+            // Mostrar escena
+            arScene.style.display = 'block';
+            
+            // Timeout de seguridad para mostrar UI
+            setTimeout(() => {
                 if (document.getElementById('loading').style.display !== 'none') {
-                    console.log('Timeout alcanzado, forzando UI...');
+                    console.log('⏰ Timeout alcanzado, mostrando UI...');
                     hideLoading();
                     showUI();
                 }
-            }, 8000);
+            }, 10000);
         }
 
         function hideLoading() {
@@ -350,48 +313,63 @@
             const loading = document.querySelector('#loading');
             if (loading) {
                 loading.innerHTML = `
-                    <div style="color: #ff6b6b; font-size: 16px;">❌ Error</div>
-                    <div style="margin-top: 8px; font-size: 12px;">${message}</div>
-                    <div style="margin-top: 12px; font-size: 11px; opacity: 0.7;">
-                        Verifica tu conexión y que estés en HTTPS
+                    <div style="color: #ff6b6b; font-size: 16px; margin-bottom: 8px;">❌ Error</div>
+                    <div style="font-size: 12px; margin-bottom: 12px;">${message}</div>
+                    <div style="font-size: 10px; opacity: 0.7;">
+                        Verifica: HTTPS, Chrome/Safari nativo, permisos de cámara
                     </div>
                 `;
             }
+            console.error('Error:', message);
         }
 
-        // Verificar compatibilidad
-        function checkCompatibility() {
-            const isHTTPS = location.protocol === 'https:' || location.hostname === 'localhost';
-            const hasUserMedia = navigator.mediaDevices && navigator.mediaDevices.getUserMedia;
-            
-            if (!isHTTPS) {
-                showError('Se requiere HTTPS para acceder a la cámara');
-                return false;
-            }
-            
-            if (!hasUserMedia) {
-                showError('Tu navegador no soporta acceso a cámara');
-                return false;
-            }
-            
-            return true;
-        }
-
-        // Iniciar cuando el DOM esté listo
+        // Inicializar cuando el DOM esté listo
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('🚀 DOM cargado, verificando compatibilidad...');
+            console.log('📱 DOM cargado');
             
-            if (checkCompatibility()) {
-                updateLoadingText('Iniciando carga de librerías...');
-                loadAFrame();
+            if (!checkCompatibility()) {
+                return;
             }
+
+            updateLoadingText('Cargando librerías AR...');
+            
+            // Verificar que A-Frame esté disponible
+            if (typeof AFRAME === 'undefined') {
+                showError('A-Frame no se cargó correctamente');
+                return;
+            }
+            
+            console.log('✅ A-Frame disponible');
+            
+            // Esperar a MindAR
+            waitForMindAR();
         });
 
         // Manejo de errores globales
         window.addEventListener('error', function(e) {
             console.error('❌ Error global:', e.error);
-            showError('Error: ' + (e.error ? e.error.message : 'Desconocido'));
         });
+
+        // Debug: Verificar archivos
+        function checkFiles() {
+            const files = ['./targets.mind', './covid.glb'];
+            files.forEach(file => {
+                fetch(file, { method: 'HEAD' })
+                    .then(response => {
+                        if (response.ok) {
+                            console.log(`✅ ${file} existe`);
+                        } else {
+                            console.error(`❌ ${file} no encontrado (${response.status})`);
+                        }
+                    })
+                    .catch(err => {
+                        console.error(`❌ Error verificando ${file}:`, err);
+                    });
+            });
+        }
+
+        // Verificar archivos después de 1 segundo
+        setTimeout(checkFiles, 1000);
     </script>
 </body>
 </html>
