@@ -2,7 +2,9 @@
 <html lang="es">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, shrink-to-fit=no" />
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>WebAR con MindAR – Image Tracking</title>
     
     <!-- OPCIÓN A: Librerías locales (recomendado) -->
@@ -10,10 +12,10 @@
          1. aframe.min.js (desde https://github.com/aframevr/aframe/releases/tag/v1.4.0)
          2. mindar-image-aframe.prod.js (desde mind-ar releases)
          Luego descomenta estas líneas: -->
-
+    <!--
     <script src="./aframe.min.js"></script>
     <script src="./mindar-image-aframe.prod.js"></script>
-
+    -->
     
     <!-- OPCIÓN B: Fallback usando GitHub raw (temporal) -->
     <script src="https://raw.githubusercontent.com/aframevr/aframe/v1.4.0/dist/aframe.min.js"></script>
@@ -31,7 +33,6 @@
         
         function loadMindAR() {
             const script = document.createElement('script');
-            // Usando un CDN alternativo más pequeño
             script.src = 'https://raw.githubusercontent.com/hiukim/mind-ar-js/master/dist/mindar-image-aframe.prod.js';
             script.onload = () => {
                 console.log('✅ MindAR cargado');
@@ -39,13 +40,11 @@
             };
             script.onerror = () => {
                 console.error('❌ Error cargando MindAR');
-                // Crear versión simplificada sin MindAR
                 createSimplifiedAR();
             };
             document.head.appendChild(script);
         }
         
-        // Iniciar verificación cuando termine de cargar el HTML
         setTimeout(checkAFrame, 100);
     </script>
     
@@ -58,11 +57,22 @@
             overflow: hidden;
             background: #000;
             font-family: system-ui, -apple-system, sans-serif;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        
+        /* Ocultar barras del navegador en móvil */
+        body {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
         }
         
         #ui {
             position: fixed;
-            top: 12px;
+            top: 20px;
             left: 12px;
             right: 12px;
             z-index: 1000;
@@ -80,11 +90,48 @@
             border-radius: 16px;
             font-size: 12px;
             backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        #cameraPermission {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 2000;
+            color: white;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 30px 20px;
+            border-radius: 16px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            max-width: 300px;
+        }
+        
+        #cameraPermission button {
+            padding: 12px 24px;
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            margin-top: 15px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+        }
+        
+        #cameraPermission button:hover {
+            background: linear-gradient(45deg, #45a049, #4CAF50);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
         }
         
         #help {
             position: fixed;
-            bottom: 12px;
+            bottom: 20px;
             left: 12px;
             right: 12px;
             z-index: 1000;
@@ -96,6 +143,7 @@
             font-size: 11px;
             line-height: 1.4;
             backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
         
         #loading {
@@ -106,20 +154,21 @@
             z-index: 1001;
             color: white;
             text-align: center;
-            background: rgba(0, 0, 0, 0.8);
-            padding: 20px;
-            border-radius: 12px;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 30px 20px;
+            border-radius: 16px;
             backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
         
         .spinner {
-            width: 40px;
-            height: 40px;
+            width: 50px;
+            height: 50px;
             border: 4px solid rgba(255, 255, 255, 0.3);
             border-radius: 50%;
-            border-top-color: white;
+            border-top-color: #4CAF50;
             animation: spin 1s ease-in-out infinite;
-            margin: 0 auto 12px;
+            margin: 0 auto 15px;
         }
         
         @keyframes spin {
@@ -127,8 +176,17 @@
         }
         
         a-scene {
-            width: 100vw;
-            height: 100vh;
+            width: 100vw !important;
+            height: 100vh !important;
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+        }
+        
+        /* Asegurar que la cámara de fondo sea visible */
+        a-scene canvas {
+            width: 100% !important;
+            height: 100% !important;
         }
         
         .a-enter-vr {
@@ -137,7 +195,7 @@
         
         #debug {
             position: fixed;
-            bottom: 80px;
+            bottom: 100px;
             left: 12px;
             right: 12px;
             background: rgba(0, 0, 0, 0.8);
@@ -148,64 +206,79 @@
             max-height: 60px;
             overflow-y: auto;
             z-index: 1000;
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
         
-        #simplifiedMode {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 2000;
-            color: white;
-            text-align: center;
-            background: rgba(0, 0, 0, 0.9);
-            padding: 20px;
-            border-radius: 12px;
-            backdrop-filter: blur(10px);
-            display: none;
+        /* Estilos específicos para móvil */
+        @media (max-width: 768px) {
+            #ui .chip {
+                font-size: 10px;
+                padding: 6px 10px;
+            }
+            
+            #help {
+                font-size: 10px;
+                bottom: 10px;
+            }
+            
+            #debug {
+                bottom: 70px;
+                font-size: 9px;
+            }
+        }
+        
+        /* Prevenir zoom en inputs táctiles */
+        @media (max-width: 768px) {
+            input, select, textarea {
+                font-size: 16px !important;
+            }
         }
     </style>
 </head>
 <body>
-    <div id="loading">
+    <div id="cameraPermission">
+        <h3>📱 WebAR Ready</h3>
+        <p>Necesitamos acceso a tu cámara para el AR</p>
+        <button onclick="requestCameraAndStart()">
+            🎥 Activar Cámara
+        </button>
+        <div style="margin-top: 10px; font-size: 11px; opacity: 0.7;">
+            Asegúrate de permitir el acceso
+        </div>
+    </div>
+    
+    <div id="loading" style="display: none;">
         <div class="spinner"></div>
-        <div id="loadingText">Cargando AR...</div>
+        <div id="loadingText">Iniciando AR...</div>
     </div>
     
     <div id="ui" style="display: none;">
         <div class="chip">📷 Apunta al marcador impreso</div>
-        <div class="chip">🔄 Toca y arrastra para rotar</div>
+        <div class="chip">🔄 Toca para interactuar</div>
     </div>
     
     <div id="debug"></div>
-    
-    <div id="simplifiedMode">
-        <h3>🔧 Modo Simplificado</h3>
-        <p>MindAR no disponible.<br>Mostrando modelo 3D básico.</p>
-        <button onclick="startSimplified()" style="padding: 10px 20px; background: #4CAF50; color: white; border: none; border-radius: 6px; cursor: pointer;">
-            Continuar
-        </button>
-    </div>
     
     <!-- La escena se crea dinámicamente -->
 
     <div id="help" style="display: none;">
         <strong>💡 Consejos:</strong><br>
-        • Permite acceso a la cámara<br>
         • Mantén buena iluminación<br>
-        • Si no hay marcador, verás el modelo 3D flotando
+        • Apunta directamente al marcador<br>
+        • Si no aparece, mueve el teléfono lentamente
     </div>
 
     <script>
         let debugLogs = [];
         let arScene;
+        let isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         
         function log(message) {
             console.log(message);
             debugLogs.push(message);
             const debugEl = document.getElementById('debug');
-            if (debugEl && debugLogs.length <= 5) {
-                debugEl.innerHTML = debugLogs.slice(-5).join('<br>');
+            if (debugEl && debugLogs.length <= 4) {
+                debugEl.innerHTML = debugLogs.slice(-4).join('<br>');
             }
         }
 
@@ -215,99 +288,150 @@
             log(text);
         }
 
-        // Versión simplificada sin MindAR para casos extremos
-        function createSimplifiedAR() {
-            log('🔧 Creando AR simplificado sin MindAR');
-            document.getElementById('loading').style.display = 'none';
-            document.getElementById('simplifiedMode').style.display = 'block';
+        // Solicitar permisos de cámara explícitamente
+        async function requestCameraAndStart() {
+            log('📱 Solicitando permisos de cámara...');
+            
+            try {
+                // Solicitar permisos explícitamente
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: 'environment', // Cámara trasera
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                });
+                
+                log('✅ Permisos de cámara otorgados');
+                
+                // Detener el stream temporal
+                stream.getTracks().forEach(track => track.stop());
+                
+                // Ocultar pantalla de permisos
+                document.getElementById('cameraPermission').style.display = 'none';
+                document.getElementById('loading').style.display = 'block';
+                
+                // Inicializar AR
+                initializeAR();
+                
+            } catch (error) {
+                log('❌ Error de cámara: ' + error.message);
+                alert('❌ No se pudo acceder a la cámara. Verifica los permisos en la configuración del navegador.');
+            }
         }
 
-        function startSimplified() {
-            document.getElementById('simplifiedMode').style.display = 'none';
+        function initializeAR() {
+            log('🚀 Inicializando AR...');
             
-            const sceneHTML = `
-            <a-scene
-                id="arScene"
-                background="color: #000"
-                vr-mode-ui="enabled: false"
-                device-orientation-permission-ui="enabled: false"
-                loading-screen="enabled: false"
-                embedded
-            >
-                <a-assets>
-                    <a-asset-item id="covidModel" src="./covid.glb"></a-asset-item>
-                </a-assets>
+            if (!checkCompatibility()) {
+                return;
+            }
 
-                <a-light type="ambient" intensity="0.6"></a-light>
-                <a-light type="directional" position="2 4 5" intensity="0.4"></a-light>
+            updateLoadingText('Verificando librerías...');
+            
+            setTimeout(() => {
+                if (typeof AFRAME !== 'undefined') {
+                    log('✅ A-Frame OK');
+                    waitForARReady();
+                } else {
+                    log('❌ A-Frame falló');
+                    showError('Error cargando A-Frame');
+                }
+            }, 1000);
+        }
 
-                <a-gltf-model 
-                    id="model3d"
-                    src="#covidModel" 
-                    position="0 -1 -3" 
-                    rotation="0 0 0" 
-                    scale="0.5 0.5 0.5"
-                    animation="property: rotation; to: 0 360 0; loop: true; dur: 10000"
-                >
-                </a-gltf-model>
+        function checkCompatibility() {
+            const isHTTPS = location.protocol === 'https:' || location.hostname === 'localhost';
+            const hasUserMedia = navigator.mediaDevices && navigator.mediaDevices.getUserMedia;
+            
+            log(`🔍 HTTPS: ${isHTTPS}, Camera: ${hasUserMedia}, Mobile: ${isMobile}`);
+            
+            if (!isHTTPS) {
+                showError('Se requiere HTTPS para WebAR');
+                return false;
+            }
+            
+            if (!hasUserMedia) {
+                showError('Tu navegador no soporta acceso a cámara');
+                return false;
+            }
+            
+            return true;
+        }
 
-                <a-camera 
-                    position="0 0 0"
-                    look-controls="enabled: true"
-                    wasd-controls="enabled: false"
-                ></a-camera>
-            </a-scene>
-            `;
-
-            document.body.insertAdjacentHTML('beforeend', sceneHTML);
-            showUI();
-            setTimeout(() => document.getElementById('debug').style.display = 'none', 3000);
+        function waitForARReady() {
+            if (window.AR_READY) {
+                log('🚀 Todo listo, creando AR');
+                checkFiles();
+                createARScene();
+            } else {
+                log('⏳ Esperando MindAR...');
+                setTimeout(waitForARReady, 200);
+            }
         }
 
         function createARScene() {
             log('🎬 Creando escena AR completa');
-            updateLoadingText('Creando escena AR...');
+            updateLoadingText('Configurando AR...');
             
             const sceneHTML = `
             <a-scene
                 id="arScene"
-                mindar-image="imageTargetSrc: ./targets.mind; maxTrack: 1; warmupTolerance: 5; missTolerance: 5"
+                mindar-image="
+                    imageTargetSrc: ./targets.mind; 
+                    maxTrack: 1; 
+                    warmupTolerance: 5; 
+                    missTolerance: 5;
+                    showStats: false;
+                "
                 color-space="sRGB"
-                renderer="colorManagement: true; physicallyCorrectLights: true"
+                renderer="
+                    colorManagement: true; 
+                    physicallyCorrectLights: true;
+                    alpha: true;
+                    antialias: true;
+                "
                 vr-mode-ui="enabled: false"
                 device-orientation-permission-ui="enabled: false"
                 loading-screen="enabled: false"
+                background="transparent"
                 embedded
             >
                 <a-assets>
                     <a-asset-item id="covidModel" src="./covid.glb"></a-asset-item>
                 </a-assets>
 
-                <a-light type="ambient" intensity="0.8"></a-light>
-                <a-light type="directional" position="2 4 5" intensity="0.5"></a-light>
+                <!-- Luces optimizadas para AR -->
+                <a-light type="ambient" intensity="0.4" color="#ffffff"></a-light>
+                <a-light type="directional" position="0 1 0" intensity="0.3" color="#ffffff"></a-light>
 
+                <!-- Target entity para el marcador -->
                 <a-entity id="targetEntity" mindar-image-target="targetIndex: 0">
                     <a-gltf-model 
                         id="model3d"
                         src="#covidModel" 
                         position="0 0 0" 
                         rotation="0 0 0" 
-                        scale="0.3 0.3 0.3"
-                        animation-mixer
+                        scale="0.1 0.1 0.1"
+                        animation-mixer="clip: *; loop: repeat"
+                        shadow="cast: true; receive: false"
                     >
                     </a-gltf-model>
                 </a-entity>
 
+                <!-- Cámara configurada para AR -->
                 <a-camera 
+                    id="arCamera"
                     position="0 0 0"
                     look-controls="enabled: false"
+                    wasd-controls="enabled: false"
                     cursor="rayOrigin: mouse"
                 ></a-camera>
             </a-scene>
             `;
 
             document.body.insertAdjacentHTML('beforeend', sceneHTML);
-            setTimeout(setupAREvents, 500);
+            setTimeout(setupAREvents, 800);
         }
 
         function setupAREvents() {
@@ -315,50 +439,88 @@
             
             if (!arScene) {
                 log('❌ Error creando escena');
-                createSimplifiedAR();
+                showError('Error creando escena AR');
                 return;
             }
 
             log('🎯 Configurando eventos AR...');
 
+            // Evento cuando MindAR inicia el render
             arScene.addEventListener('renderstart', function() {
-                log('✅ AR iniciado - cámara activa');
+                log('✅ AR iniciado - cámara de fondo activa');
                 setTimeout(() => {
                     hideLoading();
                     showUI();
-                }, 1000);
+                }, 1500);
             });
 
+            // Eventos de detección de marcador
             const targetEntity = document.querySelector('#targetEntity');
             if (targetEntity) {
                 targetEntity.addEventListener('targetFound', function() {
-                    log('🎯 Target encontrado!');
+                    log('🎯 ¡Marcador detectado!');
                     const model = document.querySelector('#model3d');
                     if (model) {
-                        model.setAttribute('animation', {
+                        // Animación de aparición
+                        model.setAttribute('animation__scale', {
+                            property: 'scale',
+                            from: '0 0 0',
+                            to: '0.15 0.15 0.15',
+                            dur: 800,
+                            easing: 'easeOutBack'
+                        });
+                        
+                        // Rotación continua
+                        model.setAttribute('animation__rotate', {
                             property: 'rotation',
                             to: '0 360 0',
                             loop: true,
-                            dur: 6000
+                            dur: 8000
+                        });
+                        
+                        // Flotar suavemente
+                        model.setAttribute('animation__float', {
+                            property: 'position',
+                            to: '0 0.1 0',
+                            dir: 'alternate',
+                            loop: true,
+                            dur: 3000,
+                            easing: 'easeInOutSine'
                         });
                     }
+                    
+                    // Actualizar UI
+                    updateChipText('🎯 ¡Marcador detectado!');
                 });
 
                 targetEntity.addEventListener('targetLost', function() {
-                    log('❌ Target perdido');
+                    log('❌ Marcador perdido');
+                    const model = document.querySelector('#model3d');
+                    if (model) {
+                        model.removeAttribute('animation__rotate');
+                        model.removeAttribute('animation__float');
+                    }
+                    updateChipText('📷 Busca el marcador...');
                 });
             }
 
-            updateLoadingText('Iniciando cámara...');
+            updateLoadingText('Activando cámara...');
             
-            // Timeout de seguridad
+            // Timeout de seguridad más largo para móviles
             setTimeout(() => {
                 if (document.getElementById('loading').style.display !== 'none') {
-                    log('⏰ Timeout - iniciando UI');
+                    log('⏰ Timeout - forzando inicio');
                     hideLoading();
                     showUI();
                 }
-            }, 8000);
+            }, 12000);
+        }
+
+        function updateChipText(text) {
+            const chips = document.querySelectorAll('#ui .chip');
+            if (chips[0]) {
+                chips[0].textContent = text;
+            }
         }
 
         function hideLoading() {
@@ -366,7 +528,7 @@
             setTimeout(() => {
                 const debug = document.getElementById('debug');
                 if (debug) debug.style.display = 'none';
-            }, 4000);
+            }, 5000);
         }
 
         function showUI() {
@@ -377,18 +539,15 @@
             if (help) help.style.display = 'block';
         }
 
-        function checkCompatibility() {
-            const isHTTPS = location.protocol === 'https:' || location.hostname === 'localhost';
-            const hasUserMedia = navigator.mediaDevices && navigator.mediaDevices.getUserMedia;
-            
-            log(`🔍 HTTPS: ${isHTTPS}, Camera: ${hasUserMedia}`);
-            
-            if (!isHTTPS) {
-                createSimplifiedAR();
-                return false;
-            }
-            
-            return true;
+        function showError(message) {
+            document.getElementById('loading').innerHTML = `
+                <div style="color: #ff6b6b; font-size: 18px; margin-bottom: 12px;">❌ Error</div>
+                <div style="font-size: 14px; margin-bottom: 15px;">${message}</div>
+                <button onclick="location.reload()" style="padding: 10px 20px; background: #4CAF50; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                    🔄 Reintentar
+                </button>
+            `;
+            log(`❌ Error: ${message}`);
         }
 
         async function checkFiles() {
@@ -407,41 +566,48 @@
             }
         }
 
-        function waitForARReady() {
-            if (window.AR_READY) {
-                log('🚀 Todo listo, creando AR');
-                checkFiles();
-                createARScene();
-            } else {
-                log('⏳ Esperando MindAR...');
-                setTimeout(waitForARReady, 200);
-            }
-        }
-
-        // Inicializar
-        document.addEventListener('DOMContentLoaded', function() {
-            log('📱 DOM listo');
-            
-            if (!checkCompatibility()) {
-                return;
-            }
-
-            updateLoadingText('Verificando librerías...');
-            
-            // Esperar a que se carguen las librerías
-            setTimeout(() => {
-                if (typeof AFRAME !== 'undefined') {
-                    log('✅ A-Frame OK');
-                    waitForARReady();
-                } else {
-                    log('❌ A-Frame falló - modo simplificado');
-                    createSimplifiedAR();
-                }
-            }, 2000);
+        // Prevenir zoom en móvil
+        document.addEventListener('gesturestart', function (e) {
+            e.preventDefault();
         });
+
+        document.addEventListener('gesturechange', function (e) {
+            e.preventDefault();
+        });
+
+        document.addEventListener('gestureend', function (e) {
+            e.preventDefault();
+        });
+
+        // Manejar orientación en móvil
+        if (isMobile) {
+            window.addEventListener('orientationchange', function() {
+                setTimeout(() => {
+                    if (arScene) {
+                        // Forzar redimensionado
+                        arScene.resize();
+                    }
+                }, 500);
+            });
+        }
 
         window.addEventListener('error', function(e) {
             log(`💥 Error: ${e.error?.message || 'Desconocido'}`);
+        });
+
+        // Inicializar automáticamente en PC, manualmente en móvil
+        document.addEventListener('DOMContentLoaded', function() {
+            log('📱 DOM listo');
+            
+            if (!isMobile) {
+                // En PC, inicializar automáticamente
+                setTimeout(() => {
+                    document.getElementById('cameraPermission').style.display = 'none';
+                    document.getElementById('loading').style.display = 'block';
+                    initializeAR();
+                }, 500);
+            }
+            // En móvil, mostrar botón de permisos
         });
     </script>
 </body>
