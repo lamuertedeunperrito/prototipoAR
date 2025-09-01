@@ -5,12 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
     <title>WebAR con MindAR – Image Tracking</title>
     
-    <!-- A-Frame primero -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.4.0/aframe.min.js"></script>
-    
-    <!-- MindAR después de A-Frame -->
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
-    
     <style>
         html, body {
             margin: 0;
@@ -93,7 +87,6 @@
             height: 100vh;
         }
         
-        /* Ocultar controles de A-Frame que no necesitamos */
         .a-enter-vr {
             display: none !important;
         }
@@ -102,7 +95,7 @@
 <body>
     <div id="loading">
         <div class="spinner"></div>
-        <div>Cargando AR...</div>
+        <div id="loadingText">Cargando librerías AR...</div>
     </div>
     
     <div id="ui" style="display: none;">
@@ -110,46 +103,8 @@
         <div class="chip">🔄 Toca y arrastra para rotar</div>
     </div>
     
-    <a-scene
-        id="arScene"
-        mindar-image="imageTargetSrc: ./targets.mind; maxTrack: 1; warmupTolerance: 5; missTolerance: 5"
-        color-space="sRGB"
-        renderer="colorManagement: true; physicallyCorrectLights: true"
-        vr-mode-ui="enabled: false"
-        device-orientation-permission-ui="enabled: false"
-        loading-screen="enabled: false"
-        embedded
-        style="display: none;"
-    >
-        <a-assets>
-            <a-asset-item id="covidModel" src="./covid.glb"></a-asset-item>
-        </a-assets>
-
-        <!-- Luces -->
-        <a-light type="ambient" intensity="0.8"></a-light>
-        <a-light type="directional" position="2 4 5" intensity="0.5"></a-light>
-
-        <!-- Entidad objetivo con el modelo 3D -->
-        <a-entity id="targetEntity" mindar-image-target="targetIndex: 0">
-            <a-gltf-model 
-                id="model3d"
-                src="#covidModel" 
-                position="0 0 0" 
-                rotation="0 0 0" 
-                scale="0.3 0.3 0.3"
-                animation-mixer
-            >
-            </a-gltf-model>
-        </a-entity>
-
-        <!-- Cámara -->
-        <a-camera 
-            position="0 0 0"
-            look-controls="enabled: false"
-            cursor="rayOrigin: mouse"
-        ></a-camera>
-    </a-scene>
-
+    <!-- La escena se creará dinámicamente cuando todo esté listo -->
+    
     <div id="help" style="display: none;">
         <strong>💡 Consejos:</strong><br>
         • Usa Chrome o Safari nativo (no Instagram/Facebook)<br>
@@ -159,47 +114,206 @@
     </div>
 
     <script>
-        let arScene;
-        let isARStarted = false;
+        let loadingText = document.getElementById('loadingText');
+        let scriptsLoaded = { aframe: false, mindar: false };
+        
+        function updateLoadingText(text) {
+            if (loadingText) {
+                loadingText.textContent = text;
+            }
+            console.log(text);
+        }
 
-        // Esperar a que todo esté cargado
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('DOM cargado, iniciando AR...');
-            
-            arScene = document.querySelector('#arScene');
-            
-            if (!arScene) {
-                console.error('No se encontró la escena AR');
+        function checkAllScriptsLoaded() {
+            if (scriptsLoaded.aframe && scriptsLoaded.mindar) {
+                console.log('Todos los scripts cargados, creando escena...');
+                createARScene();
+            }
+        }
+
+        function loadScript(src, onLoad, onError, id) {
+            // Verificar si ya existe
+            if (document.getElementById(id)) {
+                onLoad();
                 return;
             }
 
-            // Eventos de MindAR
+            const script = document.createElement('script');
+            script.id = id;
+            script.src = src;
+            script.onload = onLoad;
+            script.onerror = onError;
+            document.head.appendChild(script);
+        }
+
+        function loadAFrame() {
+            updateLoadingText('Cargando A-Frame...');
+            
+            loadScript(
+                'https://cdnjs.cloudflare.com/ajax/libs/aframe/1.4.0/aframe.min.js',
+                function() {
+                    console.log('A-Frame cargado exitosamente');
+                    if (window.AFRAME) {
+                        scriptsLoaded.aframe = true;
+                        updateLoadingText('A-Frame listo, cargando MindAR...');
+                        loadMindAR();
+                    } else {
+                        // Fallback
+                        loadScript(
+                            'https://unpkg.com/aframe@1.4.0/dist/aframe.min.js',
+                            function() {
+                                if (window.AFRAME) {
+                                    scriptsLoaded.aframe = true;
+                                    updateLoadingText('A-Frame listo (fallback), cargando MindAR...');
+                                    loadMindAR();
+                                } else {
+                                    showError('No se pudo cargar A-Frame');
+                                }
+                            },
+                            function() {
+                                showError('Error cargando A-Frame desde ambos CDN');
+                            },
+                            'aframe-fallback'
+                        );
+                    }
+                },
+                function() {
+                    console.error('Error cargando A-Frame desde CDNJS, intentando fallback...');
+                    // Intentar desde unpkg
+                    loadScript(
+                        'https://unpkg.com/aframe@1.4.0/dist/aframe.min.js',
+                        function() {
+                            if (window.AFRAME) {
+                                scriptsLoaded.aframe = true;
+                                updateLoadingText('A-Frame listo (fallback), cargando MindAR...');
+                                loadMindAR();
+                            } else {
+                                showError('No se pudo cargar A-Frame');
+                            }
+                        },
+                        function() {
+                            showError('Error cargando A-Frame desde ambos CDN');
+                        },
+                        'aframe-fallback'
+                    );
+                },
+                'aframe-main'
+            );
+        }
+
+        function loadMindAR() {
+            updateLoadingText('Cargando MindAR...');
+            
+            loadScript(
+                'https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js',
+                function() {
+                    console.log('MindAR cargado exitosamente');
+                    scriptsLoaded.mindar = true;
+                    updateLoadingText('Iniciando AR...');
+                    checkAllScriptsLoaded();
+                },
+                function() {
+                    console.error('Error cargando MindAR, intentando fallback...');
+                    loadScript(
+                        'https://unpkg.com/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js',
+                        function() {
+                            console.log('MindAR cargado desde unpkg');
+                            scriptsLoaded.mindar = true;
+                            updateLoadingText('Iniciando AR...');
+                            checkAllScriptsLoaded();
+                        },
+                        function() {
+                            showError('No se pudo cargar MindAR desde ningún CDN');
+                        },
+                        'mindar-fallback'
+                    );
+                },
+                'mindar-main'
+            );
+        }
+
+        function createARScene() {
+            console.log('Creando escena AR...');
+            
+            const sceneHTML = `
+            <a-scene
+                id="arScene"
+                mindar-image="imageTargetSrc: ./targets.mind; maxTrack: 1; warmupTolerance: 5; missTolerance: 5"
+                color-space="sRGB"
+                renderer="colorManagement: true; physicallyCorrectLights: true"
+                vr-mode-ui="enabled: false"
+                device-orientation-permission-ui="enabled: false"
+                loading-screen="enabled: false"
+                embedded
+            >
+                <a-assets>
+                    <a-asset-item id="covidModel" src="./covid.glb"></a-asset-item>
+                </a-assets>
+
+                <a-light type="ambient" intensity="0.8"></a-light>
+                <a-light type="directional" position="2 4 5" intensity="0.5"></a-light>
+
+                <a-entity id="targetEntity" mindar-image-target="targetIndex: 0">
+                    <a-gltf-model 
+                        id="model3d"
+                        src="#covidModel" 
+                        position="0 0 0" 
+                        rotation="0 0 0" 
+                        scale="0.3 0.3 0.3"
+                        animation-mixer
+                    >
+                    </a-gltf-model>
+                </a-entity>
+
+                <a-camera 
+                    position="0 0 0"
+                    look-controls="enabled: false"
+                    cursor="rayOrigin: mouse"
+                ></a-camera>
+            </a-scene>
+            `;
+
+            // Insertar la escena en el DOM
+            document.body.insertAdjacentHTML('beforeend', sceneHTML);
+            
+            // Configurar eventos después de que la escena se haya insertado
+            setTimeout(setupAREvents, 100);
+        }
+
+        function setupAREvents() {
+            const arScene = document.querySelector('#arScene');
+            
+            if (!arScene) {
+                console.error('No se pudo crear la escena AR');
+                showError('Error creando la escena AR');
+                return;
+            }
+
+            console.log('Configurando eventos AR...');
+
             arScene.addEventListener('renderstart', function() {
                 console.log('MindAR: Render iniciado');
                 hideLoading();
                 showUI();
             });
 
-            // Cuando se detecta el target
             const targetEntity = document.querySelector('#targetEntity');
             if (targetEntity) {
                 targetEntity.addEventListener('targetFound', function() {
-                    console.log('Target encontrado!');
-                    // Opcional: agregar animación cuando se detecta
+                    console.log('🎯 Target encontrado!');
                     const model = document.querySelector('#model3d');
                     if (model) {
                         model.setAttribute('animation', {
                             property: 'rotation',
                             to: '0 360 0',
                             loop: true,
-                            dur: 10000
+                            dur: 8000
                         });
                     }
                 });
 
                 targetEntity.addEventListener('targetLost', function() {
-                    console.log('Target perdido');
-                    // Opcional: detener animación
+                    console.log('❌ Target perdido');
                     const model = document.querySelector('#model3d');
                     if (model) {
                         model.removeAttribute('animation');
@@ -207,27 +321,14 @@
                 });
             }
 
-            // Inicializar después de un breve delay
-            setTimeout(initializeAR, 500);
-        });
-
-        function initializeAR() {
-            console.log('Inicializando AR...');
-            
-            try {
-                // Mostrar la escena
-                arScene.style.display = 'block';
-                
-                // Forzar inicio si no se ha iniciado automáticamente
-                if (!isARStarted) {
-                    console.log('Forzando inicio de AR...');
-                    isARStarted = true;
+            // Timeout de seguridad para mostrar UI aunque no se dispare renderstart
+            setTimeout(function() {
+                if (document.getElementById('loading').style.display !== 'none') {
+                    console.log('Timeout alcanzado, forzando UI...');
+                    hideLoading();
+                    showUI();
                 }
-                
-            } catch (error) {
-                console.error('Error al inicializar AR:', error);
-                showError('Error al inicializar AR: ' + error.message);
-            }
+            }, 8000);
         }
 
         function hideLoading() {
@@ -251,16 +352,14 @@
                 loading.innerHTML = `
                     <div style="color: #ff6b6b; font-size: 16px;">❌ Error</div>
                     <div style="margin-top: 8px; font-size: 12px;">${message}</div>
+                    <div style="margin-top: 12px; font-size: 11px; opacity: 0.7;">
+                        Verifica tu conexión y que estés en HTTPS
+                    </div>
                 `;
             }
         }
 
-        // Manejo de errores globales
-        window.addEventListener('error', function(e) {
-            console.error('Error global:', e.error);
-        });
-
-        // Verificar compatibilidad de dispositivo
+        // Verificar compatibilidad
         function checkCompatibility() {
             const isHTTPS = location.protocol === 'https:' || location.hostname === 'localhost';
             const hasUserMedia = navigator.mediaDevices && navigator.mediaDevices.getUserMedia;
@@ -278,10 +377,21 @@
             return true;
         }
 
-        // Verificar compatibilidad al cargar
-        if (!checkCompatibility()) {
-            console.warn('Dispositivo no compatible');
-        }
+        // Iniciar cuando el DOM esté listo
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 DOM cargado, verificando compatibilidad...');
+            
+            if (checkCompatibility()) {
+                updateLoadingText('Iniciando carga de librerías...');
+                loadAFrame();
+            }
+        });
+
+        // Manejo de errores globales
+        window.addEventListener('error', function(e) {
+            console.error('❌ Error global:', e.error);
+            showError('Error: ' + (e.error ? e.error.message : 'Desconocido'));
+        });
     </script>
 </body>
 </html>
