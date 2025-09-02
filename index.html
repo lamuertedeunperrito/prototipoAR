@@ -1,652 +1,181 @@
 <!doctype html>
 <html lang="es">
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, shrink-to-fit=no" />
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>WebAR con MindAR – Image Tracking</title>
-    
-    <style>
-        html, body {
-            margin: 0;
-            padding: 0;
-            height: 100%;
-            width: 100%;
-            overflow: hidden;
-            background: #000;
-            font-family: system-ui, -apple-system, sans-serif;
-            -webkit-user-select: none;
-            user-select: none;
-        }
-        
-        body {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-        }
-        
-        #ui {
-            position: fixed;
-            top: 20px;
-            left: 12px;
-            right: 12px;
-            z-index: 1000;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            align-items: center;
-            pointer-events: none;
-        }
-        
-        #ui .chip {
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-            padding: 8px 12px;
-            border-radius: 16px;
-            font-size: 12px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        
-        #startScreen {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 2000;
-            color: white;
-            text-align: center;
-            background: rgba(0, 0, 0, 0.9);
-            padding: 30px 20px;
-            border-radius: 16px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            max-width: 320px;
-        }
-        
-        #startScreen button {
-            padding: 12px 24px;
-            background: linear-gradient(45deg, #4CAF50, #45a049);
-            color: white;
-            border: none;
-            border-radius: 25px;
-            cursor: pointer;
-            font-size: 16px;
-            font-weight: 600;
-            margin: 10px 5px;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
-            width: 100%;
-        }
-        
-        #startScreen button:hover {
-            background: linear-gradient(45deg, #45a049, #4CAF50);
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
-        }
-        
-        #startScreen .fallback-btn {
-            background: linear-gradient(45deg, #2196F3, #1976D2);
-            box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);
-        }
-        
-        #startScreen .fallback-btn:hover {
-            background: linear-gradient(45deg, #1976D2, #2196F3);
-            box-shadow: 0 6px 20px rgba(33, 150, 243, 0.4);
-        }
-        
-        #help {
-            position: fixed;
-            bottom: 20px;
-            left: 12px;
-            right: 12px;
-            z-index: 1000;
-            text-align: center;
-            color: white;
-            background: rgba(0, 0, 0, 0.6);
-            padding: 12px;
-            border-radius: 12px;
-            font-size: 11px;
-            line-height: 1.4;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        
-        #loading {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 1001;
-            color: white;
-            text-align: center;
-            background: rgba(0, 0, 0, 0.9);
-            padding: 30px 20px;
-            border-radius: 16px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        
-        .spinner {
-            width: 50px;
-            height: 50px;
-            border: 4px solid rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            border-top-color: #4CAF50;
-            animation: spin 1s ease-in-out infinite;
-            margin: 0 auto 15px;
-        }
-        
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-        
-        a-scene {
-            width: 100vw !important;
-            height: 100vh !important;
-            position: absolute !important;
-            top: 0 !important;
-            left: 0 !important;
-        }
-        
-        a-scene canvas {
-            width: 100% !important;
-            height: 100% !important;
-        }
-        
-        .a-enter-vr {
-            display: none !important;
-        }
-        
-        #debug {
-            position: fixed;
-            bottom: 100px;
-            left: 12px;
-            right: 12px;
-            background: rgba(0, 0, 0, 0.8);
-            color: white;
-            padding: 8px;
-            border-radius: 6px;
-            font-size: 10px;
-            max-height: 60px;
-            overflow-y: auto;
-            z-index: 1000;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        
-        @media (max-width: 768px) {
-            #ui .chip {
-                font-size: 10px;
-                padding: 6px 10px;
-            }
-            
-            #help {
-                font-size: 10px;
-                bottom: 10px;
-            }
-            
-            #debug {
-                bottom: 70px;
-                font-size: 9px;
-            }
-        }
-        
-        @media (max-width: 768px) {
-            input, select, textarea {
-                font-size: 16px !important;
-            }
-        }
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+  <title>AR (MindAR) + Demo 3D</title>
+
+  <!-- A-Frame LOCAL (una sola versión, 1.4.0 recomendado con MindAR 1.2.5) -->
+  <script src="./aframe.min.js"></script>
+
+  <!-- MindAR A-Frame LOCAL (dist v1.2.5 copiado en /mindar) -->
+  <script src="./mindar/mindar-image-aframe.prod.js"></script>
+
+  <style>
+    :root { --bg:#0b0f13; --chip:#ffffff18; }
+    html,body{margin:0;height:100%;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+    #screen{position:fixed;inset:0;display:grid;place-items:center;gap:14px;background:var(--bg);color:#fff;padding:20px;text-align:center}
+    .btn{padding:12px 16px;border-radius:12px;border:1px solid #ffffff26;background:var(--chip);color:#fff;font-weight:600;cursor:pointer}
+    .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+    #log{position:fixed;left:12px;right:12px;bottom:12px;z-index:10;color:#0ff;background:#001014cc;padding:8px 10px;border-radius:10px;font:12px/1.3 ui-monospace,Consolas,monospace;white-space:pre-wrap;max-height:34vh;overflow:auto}
+    /* DEMO: ocupa toda la pantalla, fondo blanco */
+    #demoWrap{position:fixed;inset:0;background:#fff;display:none}
+    /* A-Frame ocupa toda la pantalla (AR y DEMO) */
+    a-scene{position:fixed;inset:0}
+    .hint{opacity:.8;font-size:12px}
+  </style>
 </head>
 <body>
-    <div id="startScreen">
-        <h3>📱 WebAR Prototype</h3>
-        <p>Elige cómo iniciar la experiencia AR:</p>
-        
-        <button onclick="startWithLibraries()">
-            🚀 AR Completo
-        </button>
-        <div style="font-size: 10px; margin: 5px 0; opacity: 0.7;">
-            Con detección de marcador (requiere librerías)
-        </div>
-        
-        <button onclick="startSimplified()" class="fallback-btn">
-            🎮 Modo Demo
-        </button>
-        <div style="font-size: 10px; margin: 5px 0; opacity: 0.7;">
-            Modelo 3D sin AR (funciona siempre)
-        </div>
+  <!-- Pantalla inicial -->
+  <div id="screen">
+    <div style="font-size:18px;opacity:.9">Prototipo: MindAR (marker) + Demo 3D</div>
+    <div class="row">
+      <button class="btn" id="btnAR">🚀 Iniciar AR (marcador)</button>
+      <button class="btn" id="btnDemo">🎮 Demo 3D (sin AR)</button>
     </div>
-    
-    <div id="loading" style="display: none;">
-        <div class="spinner"></div>
-        <div id="loadingText">Cargando...</div>
-    </div>
-    
-    <div id="ui" style="display: none;">
-        <div class="chip">📷 Apunta al marcador impreso</div>
-        <div class="chip">🔄 Toca para interactuar</div>
-    </div>
-    
-    <div id="debug"></div>
+    <div class="hint">AR requiere HTTPS + cámara en navegador nativo (Chrome/Safari). Demo 3D funciona en todo.</div>
+  </div>
 
-    <div id="help" style="display: none;">
-        <strong>💡 Consejos:</strong><br>
-        • Mantén buena iluminación<br>
-        • Apunta directamente al marcador<br>
-        • Si no aparece, mueve el teléfono lentamente
-    </div>
+  <!-- Contenedor del modo DEMO (sin AR, fondo blanco) -->
+  <div id="demoWrap"></div>
 
-    <script>
-        let debugLogs = [];
-        let arScene;
-        let isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        
-        // CDNs múltiples para A-Frame
-        const AFRAME_CDNS = [
-            'https://aframe.io/releases/1.4.0/aframe.min.js',
-            'https://unpkg.com/aframe@1.4.0/dist/aframe.min.js',
-            'https://cdnjs.cloudflare.com/ajax/libs/aframe/1.4.0/aframe.min.js'
-        ];
-        
-        const MINDAR_CDNS = [
-            './mindar-image-aframe.prod.js',
-            'https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js',
-            'https://unpkg.com/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js'
-        ];
-        
-        function log(message) {
-            console.log(message);
-            debugLogs.push(message);
-            const debugEl = document.getElementById('debug');
-            if (debugEl && debugLogs.length <= 4) {
-                debugEl.innerHTML = debugLogs.slice(-4).join('<br>');
+  <div id="log"></div>
+
+  <script>
+    // ===== utilidades mínimas =====
+    const logEl = document.getElementById('log');
+    const log = m => { console.log(m); logEl.textContent += (logEl.textContent?'\n':'') + m; logEl.scrollTop = logEl.scrollHeight; };
+    const isSecure = location.protocol.startsWith('https') || location.hostname === 'localhost';
+
+    if(!isSecure) log('⚠️ Requiere HTTPS para usar la cámara.');
+    if(!window.AFRAME) log('❌ A-Frame NO cargó (revisa aframe.min.js).');
+
+    // ===== DEMO 3D (sin AR) =====
+    // Fondo blanco, modelo centrado; auto-rotación cuando no hay interacción; arrastre para rotar, rueda/pinza para zoom
+    function startDemo(){
+      document.getElementById('screen').style.display='none';
+      const wrap = document.getElementById('demoWrap');
+      wrap.style.display='block';
+
+      wrap.innerHTML = `
+        <a-scene id="demoScene" background="color: #ffffff" renderer="colorManagement:true" vr-mode-ui="enabled:false">
+          <a-assets><a-asset-item id="covidModel" src="./covid.glb"></a-asset-item></a-assets>
+
+          <a-entity light="type: ambient; intensity: 0.9"></a-entity>
+          <a-entity light="type: directional; intensity: 0.8" position="1 1 1"></a-entity>
+
+          <a-entity id="pivot" position="0 1.2 -2.2">
+            <a-gltf-model id="model3d" src="#covidModel" rotation="0 0 0" scale="0.22 0.22 0.22"></a-gltf-model>
+          </a-entity>
+
+          <a-camera id="cam" position="0 1.2 0" look-controls="enabled:false" wasd-controls="enabled:false"></a-camera>
+        </a-scene>
+      `;
+
+      const scene = document.getElementById('demoScene');
+      scene.addEventListener('loaded', ()=>{
+        const pivot = document.getElementById('pivot');
+        const state = {drag:false,lastX:0,rotY:0,auto:true,dist:2.2,min:1.0,max:5.0};
+        const canvas = scene.renderer.domElement;
+
+        // auto-rotación
+        (function tick(){
+          if(state.auto) state.rotY += 0.15;
+          const r = pivot.getAttribute('rotation');
+          pivot.setAttribute('rotation', {x:r.x, y:state.rotY, z:r.z});
+          requestAnimationFrame(tick);
+        })();
+
+        // rotar por arrastre
+        const pd = e=>{ state.drag=true; state.auto=false; state.lastX=e.clientX; };
+        const pu = ()=>{ state.drag=false; setTimeout(()=> state.auto=true, 1200); };
+        const pm = e=>{ if(!state.drag) return; const dx=e.clientX-state.lastX; state.lastX=e.clientX; state.rotY += dx*0.4; };
+        canvas.addEventListener('pointerdown', pd);
+        canvas.addEventListener('pointerup', pu);
+        canvas.addEventListener('pointerleave', pu);
+        canvas.addEventListener('pointermove', pm);
+
+        // zoom con rueda
+        canvas.addEventListener('wheel', e=>{
+          e.preventDefault();
+          state.dist = clamp(state.dist + Math.sign(e.deltaY)*0.2, state.min, state.max);
+          pivot.setAttribute('position', `0 1.2 ${-state.dist}`);
+        }, {passive:false});
+
+        // zoom con pinza
+        let lastDist=0;
+        canvas.addEventListener('touchmove', e=>{
+          if(e.touches && e.touches.length===2){
+            const [a,b]=e.touches, dx=a.clientX-b.clientX, dy=a.clientY-b.clientY;
+            const d=Math.hypot(dx,dy);
+            if(lastDist){
+              const delta=(lastDist-d)/400;
+              state.dist = clamp(state.dist + delta, state.min, state.max);
+              pivot.setAttribute('position', `0 1.2 ${-state.dist}`);
+              state.auto=false;
             }
+            lastDist=d;
+          }
+        }, {passive:true});
+        canvas.addEventListener('touchend', ()=>{ lastDist=0; setTimeout(()=> state.auto=true, 1200); });
+
+        function clamp(v,min,max){ return Math.min(max, Math.max(min, v)); }
+        log('✅ Demo 3D listo.');
+      });
+    }
+
+    // ===== AR con MindAR (image tracking) =====
+    function startAR(){
+      document.getElementById('screen').style.display='none';
+
+      if(!isSecure){ log('❌ Sin HTTPS: la cámara no abrirá.'); return; }
+      if(!navigator.mediaDevices?.getUserMedia){ log('❌ Este navegador no soporta cámara.'); return; }
+
+      // inyecta escena AR
+      const sceneHTML = `
+        <a-scene
+          id="arScene"
+          mindar-image="imageTargetSrc: ./targets.mind;"
+          renderer="colorManagement:true; physicallyCorrectLights:true; alpha:true; antialias:true"
+          vr-mode-ui="enabled:false"
+          device-orientation-permission-ui="enabled:true"
+          embedded>
+          <a-assets><a-asset-item id="covidModel" src="./covid.glb"></a-asset-item></a-assets>
+
+          <a-entity light="type: ambient; intensity: 1.0"></a-entity>
+          <a-entity light="type: directional; intensity: 0.9" position="1 1 1"></a-entity>
+
+          <a-entity id="anchor" mindar-image-target="targetIndex:0">
+            <a-gltf-model id="mAR" src="#covidModel" position="0 0 0" rotation="0 0 0" scale="0.18 0.18 0.18"></a-gltf-model>
+          </a-entity>
+
+          <a-camera position="0 0 0"></a-camera>
+        </a-scene>
+      `;
+      document.body.insertAdjacentHTML('beforeend', sceneHTML);
+
+      const scene = document.getElementById('arScene');
+      scene.addEventListener('loaded', ()=> log('✅ Escena AR cargada'));
+      scene.addEventListener('renderstart', ()=> log('🎥 Cámara activa'));
+
+      const anchor = ()=>document.getElementById('anchor');
+      setTimeout(()=>{
+        const a=anchor();
+        if(a){
+          a.addEventListener('targetFound', ()=> log('🔵 target FOUND'));
+          a.addEventListener('targetLost',  ()=> log('⚪ target LOST'));
         }
+      }, 600);
 
-        function updateLoadingText(text) {
-            const loadingText = document.getElementById('loadingText');
-            if (loadingText) loadingText.textContent = text;
-            log(text);
-        }
+      // test permiso directo (ayuda a diagnosticar “pantalla blanca”)
+      navigator.mediaDevices.getUserMedia({video:true})
+        .then(s=>{ s.getTracks().forEach(t=>t.stop()); log('🔓 Permiso de cámara OK'); })
+        .catch(err=> log('🔒 Cámara bloqueada: '+(err?.name||err)));
+    }
 
-        function showLoading() {
-            document.getElementById('startScreen').style.display = 'none';
-            document.getElementById('loading').style.display = 'block';
-        }
-
-        function hideLoading() {
-            document.getElementById('loading').style.display = 'none';
-            setTimeout(() => {
-                const debug = document.getElementById('debug');
-                if (debug) debug.style.display = 'none';
-            }, 5000);
-        }
-
-        function showUI() {
-            const ui = document.querySelector('#ui');
-            const help = document.querySelector('#help');
-            
-            if (ui) ui.style.display = 'flex';
-            if (help) help.style.display = 'block';
-        }
-
-        function showError(message) {
-            document.getElementById('loading').innerHTML = `
-                <div style="color: #ff6b6b; font-size: 18px; margin-bottom: 12px;">❌ Error</div>
-                <div style="font-size: 14px; margin-bottom: 15px;">${message}</div>
-                <button onclick="location.reload()" style="padding: 10px 20px; background: #4CAF50; color: white; border: none; border-radius: 6px; cursor: pointer;">
-                    🔄 Reintentar
-                </button>
-                <button onclick="startSimplified()" style="padding: 10px 20px; background: #2196F3; color: white; border: none; border-radius: 6px; cursor: pointer; margin-left: 10px;">
-                    🎮 Modo Demo
-                </button>
-            `;
-            log(`❌ Error: ${message}`);
-        }
-
-        // Cargar script con timeout
-        function loadScript(url, timeout = 10000) {
-            return new Promise((resolve, reject) => {
-                const script = document.createElement('script');
-                const timer = setTimeout(() => {
-                    script.remove();
-                    reject(new Error(`Timeout loading ${url}`));
-                }, timeout);
-
-                script.onload = () => {
-                    clearTimeout(timer);
-                    resolve();
-                };
-                
-                script.onerror = () => {
-                    clearTimeout(timer);
-                    script.remove();
-                    reject(new Error(`Failed to load ${url}`));
-                };
-                
-                script.src = url;
-                document.head.appendChild(script);
-            });
-        }
-
-        // Cargar A-Frame con múltiples fallbacks
-        async function loadAFrame() {
-            updateLoadingText('Probando CDNs de A-Frame...');
-            for (let i = 0; i < AFRAME_CDNS.length; i++) {
-                const url = AFRAME_CDNS[i];
-
-                // 👇 CORRECCIÓN: Manejamos tanto URLs completas como rutas locales
-                const sourceName = url.startsWith('http') ? new URL(url).hostname : 'archivo local';
-
-                try {
-                    log(`📡 Probando A-Frame desde ${sourceName}...`);
-                    await loadScript(url, 8000);
-                    await new Promise(resolve => setTimeout(resolve, 500));
-
-                    if (typeof AFRAME !== 'undefined' && AFRAME.registerComponent) {
-                        log(`✅ A-Frame cargado desde ${sourceName}`);
-                        return true;
-                    }
-                } catch (error) {
-                    log(`❌ Falló ${sourceName}: ${error.message}`);
-                }
-            }
-            throw new Error('No se pudo cargar A-Frame desde ninguna fuente.');
-        }
-
-        // Cargar MindAR
-        async function loadMindAR() {
-            updateLoadingText('Cargando MindAR...');
-            for (let i = 0; i < MINDAR_CDNS.length; i++) {
-                const url = MINDAR_CDNS[i];
-
-                // 👇 CORRECCIÓN: Manejamos tanto URLs completas como rutas locales
-                const sourceName = url.startsWith('http') ? new URL(url).hostname : 'archivo local';
-
-                try {
-                    log(`📡 Probando MindAR desde ${sourceName}...`);
-                    await loadScript(url, 8000);
-                    log(`✅ MindAR cargado desde ${sourceName}`);
-                    return true;
-                } catch (error) {
-                    log(`❌ Falló MindAR desde ${sourceName}`);
-                }
-            }
-            throw new Error('No se pudo cargar MindAR desde ninguna fuente.');
-        }
-
-        // Solicitar permisos de cámara
-        async function requestCameraPermissions() {
-            if (!navigator.mediaDevices) {
-                throw new Error('getUserMedia no soportado');
-            }
-
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        facingMode: 'environment',
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
-                    }
-                });
-                
-                log('✅ Permisos de cámara OK');
-                stream.getTracks().forEach(track => track.stop());
-                return true;
-            } catch (error) {
-                throw new Error(`Cámara: ${error.message}`);
-            }
-        }
-
-        // Iniciar con librerías completas
-        async function startWithLibraries() {
-            showLoading();
-            log('🚀 Iniciando AR completo...');
-            
-            try {
-                // 1. Solicitar permisos
-                if (isMobile) {
-                    updateLoadingText('Verificando permisos de cámara...');
-                    await requestCameraPermissions();
-                }
-                
-                // 2. Cargar A-Frame
-                updateLoadingText('Cargando A-Frame...');
-                await loadAFrame();
-                
-                // 3. Cargar MindAR
-                updateLoadingText('Cargando MindAR...');
-                await loadMindAR();
-                
-                // 4. Crear escena AR
-                updateLoadingText('Creando escena AR...');
-                await createARScene();
-                
-                log('🎉 AR inicializado correctamente');
-                
-            } catch (error) {
-                log(`💥 Error: ${error.message}`);
-                showError(`Falló AR completo: ${error.message}`);
-            }
-        }
-
-        // Modo simplificado sin AR
-        // REEMPLAZA TU FUNCIÓN startSimplified() POR ESTA:
-      // REEMPLAZA TU ANTIGUA FUNCIÓN startSimplified() POR ESTA:
-        async function startSimplified() {
-            showLoading();
-            log('🎮 Iniciando modo demo 3D...');
-
-            try {
-                // 1. Asegurarnos de que A-Frame esté cargado
-                updateLoadingText('Cargando motor 3D (A-Frame)...');
-                // Usamos la versión 1.4.0 que es compatible
-                if (typeof AFRAME === 'undefined' || AFRAME.version !== '1.4.0') {
-                    await loadScript('https://aframe.io/releases/1.4.0/aframe.min.js');
-                }
-
-                updateLoadingText('Creando escena 3D interactiva...');
-
-                // 2. Crear el HTML de la nueva escena 3D
-                const sceneHTML = `
-                <a-scene
-                    id="demoScene"
-                    background="color: #2a3b4c"
-                    renderer="colorManagement: true;"
-                    vr-mode-ui="enabled: false">
-
-                    <a-assets>
-                        <a-asset-item id="covidModel" src="./covid.glb"></a-asset-item>
-                    </a-assets>
-
-                    <a-light type="ambient" color="#FFF" intensity="0.5"></a-light>
-                    <a-light type="directional" position="-1 1 2" intensity="1"></a-light>
-
-                    <a-gltf-model 
-                        src="#covidModel"
-                        position="0 1.2 -2.5"
-                        scale="0.2 0.2 0.2">
-                        <a-animation
-                            attribute="rotation"
-                            to="0 360 0"
-                            dur="10000"
-                            easing="linear"
-                            repeat="indefinite">
-                        </a-animation>
-                    </a-gltf-model>
-
-                    <a-plane
-                        position="0 0 -3"
-                        rotation="-90 0 0"
-                        width="10"
-                        height="10"
-                        color="#202A34">
-                    </a-plane>
-
-                    <a-camera position="0 1.6 0" wasd-controls-enabled="true" look-controls="enabled: true"></a-camera>
-                </a-scene>
-                `;
-
-                // 3. Inyectar la escena en la página
-                document.body.insertAdjacentHTML('beforeend', sceneHTML);
-
-                setTimeout(() => {
-                    hideLoading();
-                    log('✅ Modo demo 3D listo.');
-                }, 1500);
-
-            } catch (error) {
-                log(`💥 Error en modo demo: ${error.message}`);
-                showError(`No se pudo iniciar el modo demo: ${error.message}`);
-            }
-        }
-        // Crear escena AR completa
-        async function createARScene() {
-            const sceneHTML = `
-            <a-scene
-                id="arScene"
-                mindar-image="
-                    imageTargetSrc: ./targets.mind; 
-                    maxTrack: 1; 
-                    warmupTolerance: 5; 
-                    missTolerance: 5;
-                    showStats: false;
-                "
-                color-space="sRGB"
-                renderer="
-                    colorManagement: true; 
-                    physicallyCorrectLights: true;
-                    alpha: true;
-                    antialias: true;
-                "
-                vr-mode-ui="enabled: false"
-                device-orientation-permission-ui="enabled: false"
-                loading-screen="enabled: false"
-                background="transparent"
-                embedded
-            >
-                <a-assets>
-                    <a-asset-item id="covidModel" src="./covid.glb"></a-asset-item>
-                </a-assets>
-
-                <a-light type="ambient" intensity="0.4" color="#ffffff"></a-light>
-                <a-light type="directional" position="0 1 0" intensity="0.3" color="#ffffff"></a-light>
-
-                <a-entity id="targetEntity" mindar-image-target="targetIndex: 0">
-                    <a-gltf-model 
-                        id="model3d"
-                        src="#covidModel" 
-                        position="0 0 0" 
-                        rotation="0 0 0" 
-                        scale="0.1 0.1 0.1"
-                        animation-mixer="clip: *; loop: repeat"
-                        shadow="cast: true; receive: false"
-                    >
-                    </a-gltf-model>
-                </a-entity>
-
-                <a-camera 
-                    id="arCamera"
-                    position="0 0 0"
-                    look-controls="enabled: false"
-                    wasd-controls="enabled: false"
-                    cursor="rayOrigin: mouse"
-                ></a-camera>
-            </a-scene>
-            `;
-
-            document.body.insertAdjacentHTML('beforeend', sceneHTML);
-            
-            return new Promise((resolve) => {
-                setTimeout(() => {
-                    setupAREvents();
-                    resolve();
-                }, 1000);
-            });
-        }
-
-        function setupAREvents() {
-            arScene = document.querySelector('#arScene');
-            
-            if (!arScene) {
-                throw new Error('No se pudo crear la escena AR');
-            }
-
-            log('🎯 Configurando eventos AR...');
-
-            arScene.addEventListener('renderstart', function() {
-                log('✅ AR render iniciado');
-                setTimeout(() => {
-                    hideLoading();
-                    showUI();
-                }, 1500);
-            });
-
-            const targetEntity = document.querySelector('#targetEntity');
-            if (targetEntity) {
-                targetEntity.addEventListener('targetFound', function() {
-                    log('🎯 ¡Marcador detectado!');
-                    const model = document.querySelector('#model3d');
-                    if (model) {
-                        model.setAttribute('animation__scale', {
-                            property: 'scale',
-                            from: '0 0 0',
-                            to: '0.15 0.15 0.15',
-                            dur: 800,
-                            easing: 'easeOutBack'
-                        });
-                        
-                        model.setAttribute('animation__rotate', {
-                            property: 'rotation',
-                            to: '0 360 0',
-                            loop: true,
-                            dur: 8000
-                        });
-                    }
-                });
-
-                targetEntity.addEventListener('targetLost', function() {
-                    log('❌ Marcador perdido');
-                });
-            }
-            
-            // Timeout de seguridad
-            setTimeout(() => {
-                if (document.getElementById('loading').style.display !== 'none') {
-                    log('⏰ Timeout - forzando UI');
-                    hideLoading();
-                    showUI();
-                }
-            }, 12000);
-        }
-
-        // Prevenir gestos en móvil
-        ['gesturestart', 'gesturechange', 'gestureend'].forEach(event => {
-            document.addEventListener(event, e => e.preventDefault());
-        });
-
-        // Manejar rotación
-        if (isMobile) {
-            window.addEventListener('orientationchange', function() {
-                setTimeout(() => {
-                    if (arScene) arScene.resize();
-                }, 500);
-            });
-        }
-
-        window.addEventListener('error', function(e) {
-            log(`💥 Error global: ${e.error?.message || 'Desconocido'}`);
-        });
-
-        // Inicializar
-        document.addEventListener('DOMContentLoaded', function() {
-            log(`📱 Dispositivo: ${isMobile ? 'Móvil' : 'PC'}`);
-            log('✨ App lista - elige modo de inicio');
-        });
-    </script>
+    // botones
+    document.getElementById('btnDemo').addEventListener('click', startDemo);
+    document.getElementById('btnAR').addEventListener('click', startAR);
+  </script>
 </body>
 </html>
