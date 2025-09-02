@@ -247,12 +247,9 @@
         
         // CDNs múltiples para A-Frame
         const AFRAME_CDNS = [
-            './aframe.min.js',
-            'https://unpkg.com/aframe@1.4.0/dist/aframe.min.js',
-            'https://cdnjs.cloudflare.com/ajax/libs/aframe/1.4.0/aframe.min.js',
-            'https://cdn.jsdelivr.net/npm/aframe@1.4.0/dist/aframe.min.js',
             'https://aframe.io/releases/1.4.0/aframe.min.js',
-            'https://raw.githubusercontent.com/aframevr/aframe/v1.4.0/dist/aframe.min.js'
+            'https://unpkg.com/aframe@1.4.0/dist/aframe.min.js',
+            'https://cdnjs.cloudflare.com/ajax/libs/aframe/1.4.0/aframe.min.js'
         ];
         
         const MINDAR_CDNS = [
@@ -440,96 +437,76 @@
         }
 
         // Modo simplificado sin AR
-        function startSimplified() {
+        // REEMPLAZA TU FUNCIÓN startSimplified() POR ESTA:
+        async function startSimplified() {
             showLoading();
-            log('🎮 Iniciando modo demo...');
-            
-            updateLoadingText('Creando escena 3D...');
-            
-            // Crear A-Frame básico inline (sin CDN)
-            const aframeBasic = document.createElement('script');
-            aframeBasic.textContent = `
-                // A-Frame básico simplificado
+            log('🎮 Iniciando modo demo 3D...');
+
+            try {
+                // 1. Asegurarnos de que A-Frame esté cargado
+                updateLoadingText('Cargando motor 3D (A-Frame)...');
                 if (typeof AFRAME === 'undefined') {
-                    window.AFRAME = {
-                        registerComponent: function() {},
-                        version: 'simplified'
-                    };
+                    await loadAFrame(); // Reutilizamos tu función para cargar A-Frame
                 }
-            `;
-            document.head.appendChild(aframeBasic);
-            
-            setTimeout(() => {
-                const sceneHTML = `
-                <div style="
-                    width: 100vw; 
-                    height: 100vh; 
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    position: relative;
-                    overflow: hidden;
-                ">
-                    <div style="
-                        text-align: center;
-                        color: white;
-                        z-index: 10;
-                    ">
-                        <h2 style="margin-bottom: 20px;">🦠 Modelo COVID-19</h2>
-                        <div style="
-                            width: 300px;
-                            height: 300px;
-                            background: rgba(255,255,255,0.1);
-                            border-radius: 50%;
-                            margin: 0 auto 20px;
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
-                            animation: float 3s ease-in-out infinite;
-                            backdrop-filter: blur(10px);
-                            border: 2px solid rgba(255,255,255,0.2);
-                        ">
-                            <div style="
-                                font-size: 120px;
-                                animation: rotate 8s linear infinite;
-                            ">🦠</div>
-                        </div>
-                        <p style="opacity: 0.8; font-size: 14px;">
-                            Modelo 3D simulado<br>
-                            (Para AR real, verifica tu conexión)
-                        </p>
-                        <button onclick="location.reload()" style="
-                            padding: 10px 20px;
-                            background: rgba(255,255,255,0.2);
-                            color: white;
-                            border: 1px solid rgba(255,255,255,0.3);
-                            border-radius: 25px;
-                            cursor: pointer;
-                            backdrop-filter: blur(10px);
-                            margin-top: 20px;
-                        ">
-                            🔄 Intentar AR Real
-                        </button>
-                    </div>
-                    
-                    <style>
-                        @keyframes float {
-                            0%, 100% { transform: translateY(0px); }
-                            50% { transform: translateY(-20px); }
-                        }
-                        @keyframes rotate {
-                            from { transform: rotate(0deg); }
-                            to { transform: rotate(360deg); }
-                        }
-                    </style>
-                </div>
-                `;
                 
+                updateLoadingText('Creando escena 3D interactiva...');
+                
+                // 2. Crear el HTML de la nueva escena 3D
+                const sceneHTML = `
+                <a-scene
+                    id="demoScene"
+                    background="color: #2a3b4c"
+                    renderer="colorManagement: true;"
+                    vr-mode-ui="enabled: false">
+                    
+                    <a-assets>
+                        <a-asset-item id="covidModel" src="./covid.glb"></a-asset-item>
+                    </a-assets>
+
+                    <a-light type="ambient" color="#888"></a-light>
+                    <a-light type="directional" position="-1 1 2" intensity="1.5"></a-light>
+                    
+                    <a-gltf-model 
+                        src="#covidModel"
+                        position="0 1.2 -2"
+                        scale="0.2 0.2 0.2"
+                        shadow="cast: true">
+                        <a-animation
+                            attribute="rotation"
+                            to="0 360 0"
+                            dur="10000"
+                            easing="linear"
+                            repeat="indefinite">
+                        </a-animation>
+                    </a-gltf-model>
+                    
+                    <a-plane
+                        position="0 0 -2.5"
+                        rotation="-90 0 0"
+                        width="10"
+                        height="10"
+                        color="#222"
+                        shadow="receive: true">
+                    </a-plane>
+                    
+                    <a-camera position="0 1.6 0" wasd-controls-enabled="true" look-controls="enabled: true">
+                    </a-camera>
+                </a-scene>
+                `;
+
+                // 3. Inyectar la escena en la página
                 document.body.insertAdjacentHTML('beforeend', sceneHTML);
-                hideLoading();
-                log('✅ Modo demo activo');
-            }, 1000);
+
+                // Ocultar la carga y mostrar la escena
+                setTimeout(() => {
+                    hideLoading();
+                    log('✅ Modo demo 3D listo.');
+                }, 1500); // Damos un pequeño tiempo para que todo se renderice
+
+            } catch (error) {
+                log(`💥 Error en modo demo: ${error.message}`);
+                showError(`No se pudo iniciar el modo demo: ${error.message}`);
+            }
         }
 
         // Crear escena AR completa
