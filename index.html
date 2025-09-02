@@ -336,49 +336,47 @@
         // Cargar A-Frame con múltiples fallbacks
         async function loadAFrame() {
             updateLoadingText('Probando CDNs de A-Frame...');
-            
             for (let i = 0; i < AFRAME_CDNS.length; i++) {
                 const url = AFRAME_CDNS[i];
-                const cdnName = new URL(url).hostname;
-                
+
+                // 👇 CORRECCIÓN: Manejamos tanto URLs completas como rutas locales
+                const sourceName = url.startsWith('http') ? new URL(url).hostname : 'archivo local';
+
                 try {
-                    log(`📡 Probando ${cdnName}...`);
+                    log(`📡 Probando A-Frame desde ${sourceName}...`);
                     await loadScript(url, 8000);
-                    
-                    // Esperar un momento para que A-Frame se inicialice
                     await new Promise(resolve => setTimeout(resolve, 500));
-                    
+
                     if (typeof AFRAME !== 'undefined' && AFRAME.registerComponent) {
-                        log(`✅ A-Frame cargado desde ${cdnName}`);
+                        log(`✅ A-Frame cargado desde ${sourceName}`);
                         return true;
                     }
                 } catch (error) {
-                    log(`❌ Falló ${cdnName}: ${error.message}`);
+                    log(`❌ Falló ${sourceName}: ${error.message}`);
                 }
             }
-            
-            throw new Error('No se pudo cargar A-Frame');
+            throw new Error('No se pudo cargar A-Frame desde ninguna fuente.');
         }
 
         // Cargar MindAR
         async function loadMindAR() {
             updateLoadingText('Cargando MindAR...');
-            
             for (let i = 0; i < MINDAR_CDNS.length; i++) {
                 const url = MINDAR_CDNS[i];
-                const cdnName = new URL(url).hostname;
-                
+
+                // 👇 CORRECCIÓN: Manejamos tanto URLs completas como rutas locales
+                const sourceName = url.startsWith('http') ? new URL(url).hostname : 'archivo local';
+
                 try {
-                    log(`📡 Probando MindAR desde ${cdnName}...`);
+                    log(`📡 Probando MindAR desde ${sourceName}...`);
                     await loadScript(url, 8000);
-                    log(`✅ MindAR cargado desde ${cdnName}`);
+                    log(`✅ MindAR cargado desde ${sourceName}`);
                     return true;
                 } catch (error) {
-                    log(`❌ Falló MindAR desde ${cdnName}`);
+                    log(`❌ Falló MindAR desde ${sourceName}`);
                 }
             }
-            
-            throw new Error('No se pudo cargar MindAR');
+            throw new Error('No se pudo cargar MindAR desde ninguna fuente.');
         }
 
         // Solicitar permisos de cámara
@@ -438,6 +436,7 @@
 
         // Modo simplificado sin AR
         // REEMPLAZA TU FUNCIÓN startSimplified() POR ESTA:
+      // REEMPLAZA TU ANTIGUA FUNCIÓN startSimplified() POR ESTA:
         async function startSimplified() {
             showLoading();
             log('🎮 Iniciando modo demo 3D...');
@@ -445,12 +444,13 @@
             try {
                 // 1. Asegurarnos de que A-Frame esté cargado
                 updateLoadingText('Cargando motor 3D (A-Frame)...');
-                if (typeof AFRAME === 'undefined') {
-                    await loadAFrame(); // Reutilizamos tu función para cargar A-Frame
+                // Usamos la versión 1.4.0 que es compatible
+                if (typeof AFRAME === 'undefined' || AFRAME.version !== '1.4.0') {
+                    await loadScript('https://aframe.io/releases/1.4.0/aframe.min.js');
                 }
-                
+
                 updateLoadingText('Creando escena 3D interactiva...');
-                
+
                 // 2. Crear el HTML de la nueva escena 3D
                 const sceneHTML = `
                 <a-scene
@@ -458,19 +458,18 @@
                     background="color: #2a3b4c"
                     renderer="colorManagement: true;"
                     vr-mode-ui="enabled: false">
-                    
+
                     <a-assets>
                         <a-asset-item id="covidModel" src="./covid.glb"></a-asset-item>
                     </a-assets>
 
-                    <a-light type="ambient" color="#888"></a-light>
-                    <a-light type="directional" position="-1 1 2" intensity="1.5"></a-light>
-                    
+                    <a-light type="ambient" color="#FFF" intensity="0.5"></a-light>
+                    <a-light type="directional" position="-1 1 2" intensity="1"></a-light>
+
                     <a-gltf-model 
                         src="#covidModel"
-                        position="0 1.2 -2"
-                        scale="0.2 0.2 0.2"
-                        shadow="cast: true">
+                        position="0 1.2 -2.5"
+                        scale="0.2 0.2 0.2">
                         <a-animation
                             attribute="rotation"
                             to="0 360 0"
@@ -479,36 +478,32 @@
                             repeat="indefinite">
                         </a-animation>
                     </a-gltf-model>
-                    
+
                     <a-plane
-                        position="0 0 -2.5"
+                        position="0 0 -3"
                         rotation="-90 0 0"
                         width="10"
                         height="10"
-                        color="#222"
-                        shadow="receive: true">
+                        color="#202A34">
                     </a-plane>
-                    
-                    <a-camera position="0 1.6 0" wasd-controls-enabled="true" look-controls="enabled: true">
-                    </a-camera>
+
+                    <a-camera position="0 1.6 0" wasd-controls-enabled="true" look-controls="enabled: true"></a-camera>
                 </a-scene>
                 `;
 
                 // 3. Inyectar la escena en la página
                 document.body.insertAdjacentHTML('beforeend', sceneHTML);
 
-                // Ocultar la carga y mostrar la escena
                 setTimeout(() => {
                     hideLoading();
                     log('✅ Modo demo 3D listo.');
-                }, 1500); // Damos un pequeño tiempo para que todo se renderice
+                }, 1500);
 
             } catch (error) {
                 log(`💥 Error en modo demo: ${error.message}`);
                 showError(`No se pudo iniciar el modo demo: ${error.message}`);
             }
         }
-
         // Crear escena AR completa
         async function createARScene() {
             const sceneHTML = `
