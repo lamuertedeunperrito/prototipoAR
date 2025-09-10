@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
   <title>AR (MindAR) + Demo 3D — Corregido</title>
 
+  <!-- Librerías locales en la RAÍZ -->
   <script src="./aframe.min.js"></script>
   <script src="./mindar-image-aframe.prod.js"></script>
 
@@ -18,6 +19,7 @@
     #demoWrap{position:fixed;inset:0;background:#fff;display:none}
     a-scene{position:fixed;inset:0}
     .hint{opacity:.8;font-size:12px}
+    .back-btn{position:fixed;top:20px;left:20px;z-index:100;padding:8px 12px;background:#000000cc;color:#fff;border:1px solid #ffffff26;border-radius:8px;cursor:pointer;font-size:14px}
   </style>
 </head>
 <body>
@@ -27,175 +29,397 @@
       <button class="btn" id="btnAR">🚀 Iniciar AR (marcador)</button>
       <button class="btn" id="btnDemo">🎮 Demo 3D (sin AR)</button>
     </div>
-    <div class="hint">Arrastra para rotar en 360°, usa la pinza o rueda del mouse para hacer zoom.</div>
+    <div class="hint">AR: arrastra para rotar, pinza para zoom (anclado). Demo: arrastra para rotar libremente, pinza/rueda para zoom.</div>
   </div>
 
   <div id="demoWrap"></div>
   <div id="log"></div>
 
   <script>
-    // ---------- UTILIDADES ----------
+    // ---------- util ----------
     const logEl = document.getElementById('log');
     const log = m => { console.log(m); logEl.textContent += (logEl.textContent?'\n':'') + m; logEl.scrollTop = logEl.scrollHeight; };
     const isSecure = location.protocol.startsWith('https') || location.hostname === 'localhost';
     if(!isSecure) log('⚠️ Requiere HTTPS para usar la cámara.');
     if(!window.AFRAME) log('❌ A-Frame NO cargó (revisa aframe.min.js).');
-    const clamp = (v,min,max) => Math.min(max, Math.max(min, v));
 
-    // Componente para centrar el modelo y evitar que desaparezca en ángulos extraños
+    // Componente mejorado para centrar modelo
     AFRAME.registerComponent('center-model', {
       init(){
         this.el.addEventListener('model-loaded', () => {
           const obj = this.el.getObject3D('mesh');
-          if(!obj) return;
+          if(!obj) {
+            log('⚠️ No se pudo obtener el objeto 3D del modelo');
+            return;
+          }
+          
           const box = new THREE.Box3().setFromObject(obj);
           const center = box.getCenter(new THREE.Vector3());
-          obj.position.sub(center); // Mueve el objeto para que su centro geométrico sea el origen (0,0,0)
-          obj.traverse(n => { if(n.isMesh) n.frustumCulled = false; }); // Evita que partes del modelo se oculten
+          const size = box.getSize(new THREE.Vector3());
+          
+          // Centrar el modelo
+          obj.position.sub(center);
+          
+          // Configurar propiedades del mesh
+          obj.traverse(node => {
+            if(node.isMesh){
+              node.frustumCulled = false;
+              node.castShadow = true;
+              node.receiveShadow = true;
+            }
+          });
+          
+          obj.updateMatrixWorld(true);
+          log(`✅ Modelo centrado. Tamaño: ${size.x.toFixed(2)} x ${size.y.toFixed(2)} x ${size.z.toFixed(2)}`);
         });
       }
     });
 
-    // ===== MODO DEMO 3D (SIN AR) =====
+    // Utilidades
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function addBackButton(callback) {
+      const btn = document.createElement('button');
+      btn.className = 'back-btn';
+      btn.innerHTML = '← Volver';
+      btn.onclick = callback;
+      document.body.appendChild(btn);
+      return btn;
+    }
+
+    // ===== DEMO 3D =====
     function startDemo(){
-      document.getElementById('screen').style.display = 'none';
+      document.getElementById('screen').style.display='none';
       const wrap = document.getElementById('demoWrap');
-      wrap.style.display = 'block';
+      wrap.style.display='block';
 
       wrap.innerHTML = `
-        <a-scene id="demoScene" background="color: #ffffff" renderer="colorManagement:true; antialias:true" vr-mode-ui="enabled:false">
-          <a-assets timeout="30000"><a-asset-item id="covidModel" src="./covid.glb"></a-asset-item></a-assets>
-          <a-entity light="type: ambient; intensity: 1.0"></a-entity>
-          <a-entity light="type: directional; intensity: 0.8" position="1 2 1"></a-entity>
+        <a-scene id="demoScene" background="color: #f0f0f0"
+                 renderer="colorManagement:true; antialias:true" vr-mode-ui="enabled:false">
+          <a-assets timeout="30000">
+            <a-asset-item id="covidModel" src="./covid.glb"></a-asset-item>
+          </a-assets>
 
-          <a-entity id="rotator" rotation="0 0 0">
-            <a-gltf-model id="model3d" src="#covidModel" center-model scale="1.0 1.0 1.0" position="0 0 0"></a-gltf-model>
+          <a-entity light="type: ambient; intensity: 0.8"></a-entity>
+          <a-entity light="type: directional; intensity: 1.2" position="2 4 3"></a-entity>
+          <a-entity light="type: directional; intensity: 0.5" position="-2 -1 -1"></a-entity>
+
+          <!-- Estructura simplificada: contenedor para rotación libre -->
+          <a-entity id="modelContainer" position="0 0 -3">
+            <a-gltf-model id="model3d" src="#covidModel" center-model 
+                          scale="1.5 1.5 1.5" position="0 0 0"></a-gltf-model>
           </a-entity>
 
-          <a-entity id="cameraRig" position="0 0 1.5">
-             <a-camera id="camera" look-controls="enabled:false" wasd-controls="enabled:false"></a-camera>
-          </a-entity>
+          <a-camera position="0 0 0" look-controls="enabled:false" wasd-controls="enabled:false"></a-camera>
         </a-scene>
       `;
 
+      const backBtn = addBackButton(() => {
+        wrap.style.display = 'none';
+        document.getElementById('screen').style.display = 'grid';
+        backBtn.remove();
+      });
+
       const scene = document.getElementById('demoScene');
       scene.addEventListener('loaded', () => {
-        const rotator = document.getElementById('rotator');
-        const cameraRig = document.getElementById('cameraRig');
+        const container = document.getElementById('modelContainer');
         const canvas = scene.renderer.domElement;
 
-        const st = { dragging: false, lastX: 0, lastY: 0, yaw: 0, pitch: 0, velX: 0, velY: 0, dist: 1.5, min: 0.5, max: 4.0 };
-
-        (function tick(){
-          // Aplica inercia solo si no se está arrastrando
-          if (!st.dragging) {
-            st.yaw += st.velY;
-            st.pitch += st.velX;
-            st.velY *= 0.94; // Fricción
-            st.velX *= 0.94;
-          }
-          st.pitch = clamp(st.pitch, -85, 85); // Limita la rotación vertical
-          rotator.setAttribute('rotation', `${st.pitch} ${st.yaw} 0`);
-          requestAnimationFrame(tick);
-        })();
-
-        const pd = e => { st.dragging = true; st.lastX = e.clientX; st.lastY = e.clientY; st.velX = 0; st.velY = 0; };
-        const pu = () => { st.dragging = false; };
-        const pm = e => {
-          if (!st.dragging) return;
-          const dx = e.clientX - st.lastX;
-          const dy = e.clientY - st.lastY;
-          st.lastX = e.clientX;
-          st.lastY = e.clientY;
-          
-          st.yaw += dx * 0.5;
-          st.pitch += dy * 0.5;
-          
-          // Guarda la última velocidad para la inercia
-          st.velY = dx * 0.5;
-          st.velX = dy * 0.5;
+        // Estado del control
+        const state = {
+          isDragging: false,
+          lastX: 0,
+          lastY: 0,
+          rotationX: 0,
+          rotationY: 0,
+          distance: 3,
+          minDistance: 1,
+          maxDistance: 10
         };
-        
-        // Asignar eventos de puntero
-        canvas.addEventListener('pointerdown', e => { e.preventDefault(); pd(e); }, { passive: false });
-        canvas.addEventListener('pointerup',   e => { e.preventDefault(); pu(e); }, { passive: false });
-        canvas.addEventListener('pointerleave',e => { e.preventDefault(); pu(e); }, { passive: false });
-        canvas.addEventListener('pointermove', e => { e.preventDefault(); pm(e); }, { passive: false });
+
+        // Control de arrastre
+        function onPointerDown(e) {
+          e.preventDefault();
+          state.isDragging = true;
+          state.lastX = e.clientX || (e.touches && e.touches[0].clientX);
+          state.lastY = e.clientY || (e.touches && e.touches[0].clientY);
+          canvas.style.cursor = 'grabbing';
+        }
+
+        function onPointerUp(e) {
+          e.preventDefault();
+          state.isDragging = false;
+          canvas.style.cursor = 'grab';
+        }
+
+        function onPointerMove(e) {
+          if (!state.isDragging) return;
+          e.preventDefault();
+
+          const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+          const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+
+          const deltaX = clientX - state.lastX;
+          const deltaY = clientY - state.lastY;
+
+          state.rotationY += deltaX * 0.5; // Rotación horizontal
+          state.rotationX -= deltaY * 0.5; // Rotación vertical (invertida)
+          
+          // Limitar rotación vertical para evitar volteretas completas
+          state.rotationX = clamp(state.rotationX, -90, 90);
+
+          container.setAttribute('rotation', `${state.rotationX} ${state.rotationY} 0`);
+
+          state.lastX = clientX;
+          state.lastY = clientY;
+        }
+
+        // Eventos del mouse
+        canvas.addEventListener('mousedown', onPointerDown);
+        canvas.addEventListener('mouseup', onPointerUp);
+        canvas.addEventListener('mouseleave', onPointerUp);
+        canvas.addEventListener('mousemove', onPointerMove);
+        canvas.style.cursor = 'grab';
+
+        // Eventos táctiles
+        canvas.addEventListener('touchstart', e => {
+          if (e.touches.length === 1) {
+            onPointerDown(e);
+          }
+        }, { passive: false });
+
+        canvas.addEventListener('touchend', onPointerUp, { passive: false });
+        canvas.addEventListener('touchmove', e => {
+          if (e.touches.length === 1) {
+            onPointerMove(e);
+          } else if (e.touches.length === 2) {
+            // Pinch zoom
+            e.preventDefault();
+            const touch1 = e.touches[0];
+            const touch2 = e.touches[1];
+            const currentDistance = Math.hypot(
+              touch2.clientX - touch1.clientX,
+              touch2.clientY - touch1.clientY
+            );
+
+            if (state.lastTouchDistance) {
+              const scale = currentDistance / state.lastTouchDistance;
+              state.distance /= scale;
+              state.distance = clamp(state.distance, state.minDistance, state.maxDistance);
+              container.setAttribute('position', `0 0 ${-state.distance}`);
+            }
+            state.lastTouchDistance = currentDistance;
+          }
+        }, { passive: false });
+
+        canvas.addEventListener('touchend', () => {
+          state.lastTouchDistance = null;
+        });
 
         // Zoom con rueda del mouse
         canvas.addEventListener('wheel', e => {
           e.preventDefault();
-          st.dist = clamp(st.dist + Math.sign(e.deltaY) * 0.15, st.min, st.max);
-          cameraRig.setAttribute('position', `0 0 ${st.dist}`);
+          const zoomSpeed = 0.2;
+          state.distance += Math.sign(e.deltaY) * zoomSpeed;
+          state.distance = clamp(state.distance, state.minDistance, state.maxDistance);
+          container.setAttribute('position', `0 0 ${-state.distance}`);
         }, { passive: false });
 
-        // Zoom con gesto de pinza (móvil)
-        let lastPinchDist = 0;
-        canvas.addEventListener('touchmove', e => {
-          if (e.touches.length === 2) {
-            e.preventDefault();
-            const [a, b] = e.touches;
-            const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-            if (lastPinchDist) {
-              const delta = (lastPinchDist - d) / 200; // Sensibilidad del zoom
-              st.dist = clamp(st.dist + delta, st.min, st.max);
-              cameraRig.setAttribute('position', `0 0 ${st.dist}`);
-            }
-            lastPinchDist = d;
-          }
-        }, { passive: false });
-        canvas.addEventListener('touchend', () => { lastPinchDist = 0; }, { passive: false });
+        // Evento de carga del modelo
+        document.getElementById('covidModel').addEventListener('loaded', () => {
+          log('✅ Modelo COVID cargado en DEMO');
+        });
 
-        log('✅ Demo 3D listo.');
+        log('✅ Demo 3D iniciado - Controles: arrastra para rotar, rueda/pinch para zoom');
       });
     }
 
-    // ===== MODO AR (MindAR) =====
+    // ===== AR (MindAR) =====
     function startAR(){
       document.getElementById('screen').style.display='none';
-      if(!isSecure || !navigator.mediaDevices?.getUserMedia) { log('❌ Sin HTTPS o soporte de cámara.'); return; }
+      if(!isSecure){ 
+        log('❌ Requiere HTTPS para acceder a la cámara');
+        return;
+      }
+      if(!navigator.mediaDevices?.getUserMedia){ 
+        log('❌ Navegador no soporta acceso a cámara');
+        return;
+      }
 
       const sceneHTML = `
         <a-scene id="arScene"
-          mindar-image="imageTargetSrc: ./targets.mind;"
+          mindar-image="imageTargetSrc: ./targets.mind; maxTrack: 1; showStats: false;"
           renderer="colorManagement:true; physicallyCorrectLights:true; alpha:true; antialias:true"
-          vr-mode-ui="enabled:false" device-orientation-permission-ui="enabled:true" embedded>
+          vr-mode-ui="enabled:false"
+          device-orientation-permission-ui="enabled:true"
+          embedded>
           
-          <a-assets timeout="30000"><a-asset-item id="covidModelAR" src="./covid.glb"></a-asset-item></a-assets>
+          <a-assets timeout="30000">
+            <a-asset-item id="covidModelAR" src="./covid.glb"></a-asset-item>
+          </a-assets>
 
-          <a-entity light="type: ambient; intensity: 1.0"></a-entity>
-          <a-entity light="type: directional; intensity: 0.8" position="1 2 1"></a-entity>
+          <a-entity light="type: ambient; intensity: 0.6"></a-entity>
+          <a-entity light="type: directional; intensity: 1.0" position="1 2 1"></a-entity>
 
-          <a-entity id="anchor" mindar-image-target="targetIndex:0">
-            <a-gltf-model id="mAR" src="#covidModelAR" center-model scale="0.1 0.1 0.1" position="0 0 0" rotation="0 0 0"></a-gltf-model>
+          <a-entity id="anchor" mindar-image-target="targetIndex: 0">
+            <a-entity id="modelGroup" position="0 0 0">
+              <a-gltf-model id="arModel" src="#covidModelAR" center-model 
+                            scale="2.0 2.0 2.0" position="0 0.1 0"
+                            animation="property: rotation; to: 0 360 0; loop: true; dur: 8000; easing: linear;">
+              </a-gltf-model>
+            </a-entity>
           </a-entity>
 
-          <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+          <a-camera position="0 0 0"></a-camera>
         </a-scene>
       `;
+      
       document.body.insertAdjacentHTML('beforeend', sceneHTML);
 
+      const backBtn = addBackButton(() => {
+        const scene = document.getElementById('arScene');
+        if (scene) {
+          scene.remove();
+        }
+        document.getElementById('screen').style.display = 'grid';
+        backBtn.remove();
+      });
+
       const scene = document.getElementById('arScene');
-      scene.addEventListener('renderstart', ()=> log('🎥 Cámara activa'));
       
-      const anchor = document.getElementById('anchor');
-      if (anchor) {
-        anchor.addEventListener('targetFound', () => {
-          log('🔵 Marcador ENCONTRADO');
-          document.getElementById('mAR').object3D.visible = true;
+      // Eventos de la escena
+      scene.addEventListener('loaded', () => {
+        log('✅ Escena AR cargada correctamente');
+      });
+
+      scene.addEventListener('renderstart', () => {
+        log('🎥 Cámara AR activada');
+      });
+
+      // Eventos del anchor (detección de marcador)
+      setTimeout(() => {
+        const anchor = document.getElementById('anchor');
+        if (anchor) {
+          anchor.addEventListener('targetFound', () => {
+            log('🟢 ¡Marcador detectado! Mostrando modelo 3D');
+          });
+          
+          anchor.addEventListener('targetLost', () => {
+            log('🔴 Marcador perdido');
+          });
+        }
+      }, 1000);
+
+      // Evento de carga del modelo
+      setTimeout(() => {
+        document.getElementById('covidModelAR').addEventListener('loaded', () => {
+          log('✅ Modelo COVID cargado en AR');
         });
-        anchor.addEventListener('targetLost', () => {
-          log('⚪ Marcador PERDIDO');
-          document.getElementById('mAR').object3D.visible = false;
+
+        document.getElementById('covidModelAR').addEventListener('error', () => {
+          log('❌ Error al cargar el modelo COVID en AR');
         });
-      }
-      
-      log('✅ Escena AR lista. Apunta al marcador.');
+      }, 500);
+
+      // Controles táctiles para AR (rotación y escala)
+      scene.addEventListener('loaded', () => {
+        const modelGroup = document.getElementById('modelGroup');
+        const canvas = scene.renderer.domElement;
+        
+        const arState = {
+          isDragging: false,
+          lastX: 0,
+          lastY: 0,
+          rotationY: 0,
+          scale: 2.0,
+          minScale: 0.5,
+          maxScale: 4.0
+        };
+
+        // Control de rotación con arrastre
+        function onARPointerDown(e) {
+          if (!document.getElementById('anchor').components['mindar-image-target'].isTracked) return;
+          e.preventDefault();
+          arState.isDragging = true;
+          arState.lastX = e.clientX || (e.touches && e.touches[0].clientX);
+        }
+
+        function onARPointerUp(e) {
+          e.preventDefault();
+          arState.isDragging = false;
+        }
+
+        function onARPointerMove(e) {
+          if (!arState.isDragging) return;
+          if (!document.getElementById('anchor').components['mindar-image-target'].isTracked) return;
+          e.preventDefault();
+
+          const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+          const deltaX = clientX - arState.lastX;
+          arState.rotationY += deltaX * 0.5;
+          
+          const arModel = document.getElementById('arModel');
+          arModel.setAttribute('rotation', `0 ${arState.rotationY} 0`);
+          // Pausar la animación automática cuando el usuario interactúa
+          arModel.setAttribute('animation', 'enabled: false');
+          
+          arState.lastX = clientX;
+        }
+
+        canvas.addEventListener('mousedown', onARPointerDown);
+        canvas.addEventListener('mouseup', onARPointerUp);
+        canvas.addEventListener('mousemove', onARPointerMove);
+        canvas.addEventListener('touchstart', onARPointerDown, { passive: false });
+        canvas.addEventListener('touchend', onARPointerUp, { passive: false });
+        canvas.addEventListener('touchmove', e => {
+          if (e.touches.length === 1) {
+            onARPointerMove(e);
+          } else if (e.touches.length === 2) {
+            // Pinch para escala
+            if (!document.getElementById('anchor').components['mindar-image-target'].isTracked) return;
+            e.preventDefault();
+            
+            const touch1 = e.touches[0];
+            const touch2 = e.touches[1];
+            const currentDistance = Math.hypot(
+              touch2.clientX - touch1.clientX,
+              touch2.clientY - touch1.clientY
+            );
+
+            if (arState.lastTouchDistance) {
+              const scaleChange = currentDistance / arState.lastTouchDistance;
+              arState.scale *= scaleChange;
+              arState.scale = clamp(arState.scale, arState.minScale, arState.maxScale);
+              
+              const arModel = document.getElementById('arModel');
+              arModel.setAttribute('scale', `${arState.scale} ${arState.scale} ${arState.scale}`);
+            }
+            arState.lastTouchDistance = currentDistance;
+          }
+        }, { passive: false });
+
+        canvas.addEventListener('touchend', () => {
+          arState.lastTouchDistance = null;
+          // Reanudar animación después de un tiempo sin interacción
+          setTimeout(() => {
+            const arModel = document.getElementById('arModel');
+            if (arModel) {
+              arModel.setAttribute('animation', 'enabled: true');
+            }
+          }, 3000);
+        });
+
+        log('✅ Controles AR configurados - Arrastra para rotar, pinch para escalar');
+      });
     }
 
-    // ---------- INICIALIZACIÓN ----------
+    // Event listeners
     document.getElementById('btnDemo').addEventListener('click', startDemo);
     document.getElementById('btnAR').addEventListener('click', startAR);
+
+    log('🚀 Sistema listo. Asegúrate de tener los archivos: aframe.min.js, mindar-image-aframe.prod.js, covid.glb y targets.mind');
   </script>
 </body>
 </html>
