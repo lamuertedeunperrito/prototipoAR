@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-  <title>AR (MindAR) + Demo 3D</title>
+  <title>AR (MindAR) + Demo 3D — estable</title>
 
   <!-- Librerías locales en la RAÍZ -->
   <script src="./aframe.min.js"></script>
@@ -28,21 +28,21 @@
       <button class="btn" id="btnAR">🚀 Iniciar AR (marcador)</button>
       <button class="btn" id="btnDemo">🎮 Demo 3D (sin AR)</button>
     </div>
-    <div class="hint">AR: arrastra para rotar el modelo, pinza/rueda para zoom (anclado al marcador). Demo: igual en fondo blanco.</div>
+    <div class="hint">AR: arrastra para rotar, pinza/rueda para zoom (anclado). Demo: igual en fondo blanco.</div>
   </div>
 
   <div id="demoWrap"></div>
   <div id="log"></div>
 
   <script>
-    // ---------- utilidades ----------
+    // ---------- util ----------
     const logEl = document.getElementById('log');
     const log = m => { console.log(m); logEl.textContent += (logEl.textContent?'\n':'') + m; logEl.scrollTop = logEl.scrollHeight; };
     const isSecure = location.protocol.startsWith('https') || location.hostname === 'localhost';
     if(!isSecure) log('⚠️ Requiere HTTPS para usar la cámara.');
     if(!window.AFRAME) log('❌ A-Frame NO cargó (revisa aframe.min.js).');
 
-    // === Componente: centrar el modelo en su bounding box ===
+    // Centrar y desactivar frustum-culling para evitar "desapariciones"
     AFRAME.registerComponent('center-model', {
       init(){
         this.el.addEventListener('model-loaded', () => {
@@ -50,13 +50,14 @@
           if(!obj) return;
           const box = new THREE.Box3().setFromObject(obj);
           const center = box.getCenter(new THREE.Vector3());
-          obj.position.sub(center);      // lo llevamos al origen (0,0,0)
+          obj.position.sub(center);
+          obj.traverse(n=>{ if(n.isMesh){ n.frustumCulled = false; n.castShadow = true; n.receiveShadow = true; } });
           obj.updateMatrixWorld(true);
         });
       }
     });
 
-    // =============== DEMO 3D (sin AR) ===============
+    // ===== DEMO =====
     function startDemo(){
       document.getElementById('screen').style.display='none';
       const wrap = document.getElementById('demoWrap');
@@ -72,32 +73,34 @@
           <a-entity light="type: ambient; intensity: 1.0"></a-entity>
           <a-entity light="type: directional; intensity: 0.9" position="1 1 1"></a-entity>
 
-          <!-- Más grande y cerca -->
-          <a-entity id="pivot" position="0 1.2 -0.8" rotation="0 0 0">
-            <a-gltf-model id="model3d" src="#covidModel" center-model scale="0.9 0.9 0.9"></a-gltf-model>
+          <!-- Estructura: pivot (distancia/zoom) -> rotator (rotación 2 ejes) -> model -->
+          <a-entity id="pivot" position="0 0 -0.9">
+            <a-entity id="rotator" rotation="0 0 0">
+              <a-gltf-model id="model3d" src="#covidModel" center-model scale="1.0 1.0 1.0" position="0 0 0"></a-gltf-model>
+            </a-entity>
           </a-entity>
 
-          <a-camera position="0 1.2 0" look-controls="enabled:false" wasd-controls="enabled:false"></a-camera>
+          <a-entity camera="near:0.01; far:100" position="0 0 0" look-controls="enabled:false" wasd-controls="enabled:false"></a-entity>
         </a-scene>
       `;
 
       const scene = document.getElementById('demoScene');
       scene.addEventListener('loaded', ()=>{
-        const pivot = document.getElementById('pivot');
-        const model = document.getElementById('model3d'); // rotaremos el modelo centrado
-        const canvas = scene.renderer.domElement;
+        const pivot   = document.getElementById('pivot');      // solo Z (zoom)
+        const rotator = document.getElementById('rotator');    // rotación 2 ejes
+        const canvas  = scene.renderer.domElement;
 
         const st = {
           dragging:false, lastX:0, lastY:0,
           yaw:0, pitch:0, vy:0, vx:0,
-          dist:0.8, min:0.4, max:5.0
+          dist:0.9, min:0.35, max:5.0
         };
 
         (function tick(){
           if(Math.abs(st.vy)>0.0005){ st.yaw += st.vy; st.vy *= 0.95; } else { st.vy=0; }
           if(Math.abs(st.vx)>0.0005){ st.pitch += st.vx; st.vx *= 0.95; } else { st.vx=0; }
           st.pitch = clamp(st.pitch, -80, 80);
-          model.setAttribute('rotation', {x:st.pitch, y:st.yaw, z:0});
+          rotator.setAttribute('rotation', {x:st.pitch, y:st.yaw, z:0});
           requestAnimationFrame(tick);
         })();
 
@@ -112,19 +115,19 @@
           st.vy     = dx*0.035;
           st.vx     = -dy*0.025;
         };
-        canvas.addEventListener('pointerdown', pd, {passive:false});
-        canvas.addEventListener('pointerup', pu, {passive:false});
-        canvas.addEventListener('pointerleave', pu, {passive:false});
+        canvas.addEventListener('pointerdown', e=>{ e.preventDefault(); pd(e); }, {passive:false});
+        canvas.addEventListener('pointerup',   e=>{ e.preventDefault(); pu(e); }, {passive:false});
+        canvas.addEventListener('pointerleave',e=>{ e.preventDefault(); pu(e); }, {passive:false});
         canvas.addEventListener('pointermove', e=>{ e.preventDefault(); pm(e); }, {passive:false});
 
-        // zoom rueda
+        // Zoom rueda → mover pivot en Z
         canvas.addEventListener('wheel', e=>{
           e.preventDefault();
-          st.dist = clamp(st.dist + Math.sign(e.deltaY)*0.15, st.min, st.max);
-          pivot.setAttribute('position', `0 1.2 ${-st.dist}`);
+          st.dist = clamp(st.dist + Math.sign(e.deltaY)*0.12, st.min, st.max);
+          pivot.setAttribute('position', `0 0 ${-st.dist}`);
         }, {passive:false});
 
-        // pinch-zoom
+        // Pinch-zoom
         let lastDist=0;
         canvas.addEventListener('touchmove', e=>{
           if(e.touches && e.touches.length===2){
@@ -134,7 +137,7 @@
             if(lastDist){
               const delta=(lastDist-d)/350;
               st.dist = clamp(st.dist + delta, st.min, st.max);
-              pivot.setAttribute('position', `0 1.2 ${-st.dist}`);
+              pivot.setAttribute('position', `0 0 ${-st.dist}`);
             }
             lastDist=d;
           }
@@ -145,15 +148,15 @@
           .addEventListener('loaded', ()=>log('✅ covid.glb cargado (DEMO)'));
 
         function clamp(v,min,max){ return Math.min(max, Math.max(min, v)); }
-        log('✅ Demo 3D listo (modelo centrado; rotación 2 ejes).');
+        log('✅ Demo 3D listo (centrado, 2 ejes, zoom por distancia).');
       });
     }
 
-    // =============== AR (MindAR) con gestos (anclado) ===============
+    // ===== AR (MindAR) =====
     function startAR(){
       document.getElementById('screen').style.display='none';
-      if(!isSecure){ log('❌ Sin HTTPS: la cámara no abrirá.'); return; }
-      if(!navigator.mediaDevices?.getUserMedia){ log('❌ Este navegador no soporta cámara.'); return; }
+      if(!isSecure){ log('❌ Sin HTTPS'); return; }
+      if(!navigator.mediaDevices?.getUserMedia){ log('❌ Navegador sin cámara'); return; }
 
       const sceneHTML = `
         <a-scene id="arScene"
@@ -169,11 +172,12 @@
           <a-entity light="type: ambient; intensity: 1.0"></a-entity>
           <a-entity light="type: directional; intensity: 0.9" position="1 1 1"></a-entity>
 
-          <!-- anchor fija posición/orientación del marcador -->
+          <!-- anchor (MindAR) → pivot (solo escala) → rotator (solo rotación) → model -->
           <a-entity id="anchor" mindar-image-target="targetIndex:0">
-            <!-- pivot sólo para ESCALA (zoom). Dejamos la rotación al modelo para no deslizar. -->
             <a-entity id="pivotAR" position="0 0 0" scale="1 1 1">
-              <a-gltf-model id="mAR" src="#covidModel" center-model scale="0.9 0.9 0.9"></a-gltf-model>
+              <a-entity id="rotatorAR" rotation="0 0 0">
+                <a-gltf-model id="mAR" src="#covidModel" center-model scale="0.9 0.9 0.9" position="0 0 0"></a-gltf-model>
+              </a-entity>
             </a-entity>
           </a-entity>
 
@@ -185,20 +189,16 @@
       const scene = document.getElementById('arScene');
       scene.addEventListener('loaded', ()=> log('✅ Escena AR cargada'));
       scene.addEventListener('renderstart', ()=> log('🎥 Cámara activa'));
-
       setTimeout(()=>{
         const a=document.getElementById('anchor');
-        if(a){
-          a.addEventListener('targetFound', ()=> log('🔵 target FOUND'));
-          a.addEventListener('targetLost',  ()=> log('⚪ target LOST'));
-        }
+        if(a){ a.addEventListener('targetFound', ()=> log('🔵 target FOUND'));
+               a.addEventListener('targetLost',  ()=> log('⚪ target LOST')); }
       }, 600);
 
-      // Gestos en AR: rotamos el MODELO (#mAR) y escalamos el PIVOT (#pivotAR)
       scene.addEventListener('loaded', ()=>{
-        const pivot = document.getElementById('pivotAR'); // solo escala
-        const model = document.getElementById('mAR');     // rotación 2 ejes sobre centro
-        const canvas = scene.renderer.domElement;
+        const pivot   = document.getElementById('pivotAR');    // escala
+        const rotator = document.getElementById('rotatorAR');  // rotación 2 ejes
+        const canvas  = scene.renderer.domElement;
 
         const st = {
           dragging:false, lastX:0, lastY:0,
@@ -210,7 +210,7 @@
           if(Math.abs(st.vy)>0.0005){ st.yaw += st.vy; st.vy *= 0.95; } else { st.vy=0; }
           if(Math.abs(st.vx)>0.0005){ st.pitch += st.vx; st.vx *= 0.95; } else { st.vx=0; }
           st.pitch = clamp(st.pitch, -80, 80);
-          model.setAttribute('rotation', {x:st.pitch, y:st.yaw, z:0});
+          rotator.setAttribute('rotation', {x:st.pitch, y:st.yaw, z:0});
           requestAnimationFrame(tick);
         })();
 
@@ -226,13 +226,12 @@
           st.vx     = -dy*0.025;
         };
 
-        // Importante: prevenir comportamiento táctil por defecto durante el gesto
         canvas.addEventListener('pointerdown', e=>{ e.preventDefault(); pd(e); }, {passive:false});
         canvas.addEventListener('pointerup',   e=>{ e.preventDefault(); pu(e); }, {passive:false});
         canvas.addEventListener('pointerleave',e=>{ e.preventDefault(); pu(e); }, {passive:false});
         canvas.addEventListener('pointermove', e=>{ e.preventDefault(); pm(e); }, {passive:false});
 
-        // pinch-zoom (escala del pivot)
+        // Pinch-zoom: solo escala del pivot (anclado)
         let lastDist=0;
         canvas.addEventListener('touchmove', e=>{
           if(e.touches && e.touches.length===2){
@@ -251,9 +250,9 @@
 
         document.getElementById('covidModel')
           .addEventListener('loaded', ()=>log('✅ covid.glb cargado (AR)'));
-
-        function clamp(v,min,max){ return Math.min(max, Math.max(min, v)); }
       });
+
+      function clamp(v,min,max){ return Math.min(max, Math.max(min, v)); }
     }
 
     // helpers / binding
