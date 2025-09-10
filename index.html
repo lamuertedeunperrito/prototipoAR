@@ -384,12 +384,10 @@
           anchor.addEventListener('targetFound', () => {
             log('🎯 ¡MARCADOR ENCONTRADO!');
             const model = document.getElementById('arModel');
-            const container = document.getElementById('arContainer');
-            if(model && container) {
+            if(model) {
               model.setAttribute('visible', 'true');
-              container.setAttribute('visible', 'true');
-              // Animación de confirmación más sutil
-              container.setAttribute('animation__found', 'property: scale; to: 3.2 3.2 3.2; dur: 300; direction: alternate; loop: 1; easing: easeInOutQuad');
+              // Añadir una pequeña animación para confirmar que funciona
+              model.setAttribute('animation__scale', 'property: scale; to: 1.1 1.1 1.1; dur: 500; direction: alternate; loop: 2; easing: easeInOutQuad');
             }
           });
           
