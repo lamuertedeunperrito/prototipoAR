@@ -191,55 +191,73 @@
     }
 
     // --- AR ESTABLE ---
-    function startAR(){
-      document.getElementById('screen').style.display = 'none';
-      log('Iniciando AR... buscando marcador.');
-      
-      const sceneEl = document.createElement('a-scene');
-      sceneEl.setAttribute('mindar-image', 'imageTargetSrc: ./targets.mind; autoStart: true;');
-      sceneEl.setAttribute('renderer', 'physicallyCorrectLights: true; colorManagement: true;');
-      sceneEl.setAttribute('vr-mode-ui', 'enabled: false');
-      sceneEl.setAttribute('device-orientation-permission-ui', 'enabled: false');
+// --- AR ESTABLE Y ROBUSTO (NUEVA VERSIÓN) ---
+function startAR() {
+  document.getElementById('screen').style.display = 'none';
+  log('Iniciando AR...');
 
-      sceneEl.innerHTML = `
-        <a-assets timeout="30000">
-          <a-asset-item id="ar-model-asset" src="./covid.glb"></a-asset-item>
-        </a-assets>
+  const sceneEl = document.createElement('a-scene');
+  document.body.appendChild(sceneEl); // Lo añadimos al cuerpo primero
 
-        <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-        <a-entity light="type: ambient; intensity: 0.8;"></a-entity>
-        <a-entity light="type: directional; intensity: 0.8;" position="0 1 1"></a-entity>
+  // Configuramos los atributos de la escena
+  sceneEl.setAttribute('mindar-image', {
+    imageTargetSrc: './targets.mind',
+    autoStart: false, // Empezaremos manualmente para asegurar que todo esté listo
+    filterMinCF: 0.001, // Parámetros para suavizar el tracking
+    filterBeta: 10,
+  });
+  sceneEl.setAttribute('renderer', 'physicallyCorrectLights: true; colorManagement: true;');
+  sceneEl.setAttribute('vr-mode-ui', 'enabled: false');
+  sceneEl.setAttribute('device-orientation-permission-ui', 'enabled: false');
 
-        <a-entity id="anchor" mindar-image-target="targetIndex: 0">
-          <a-gltf-model id="ar-model" src="#ar-model-asset" 
-                        smart-model="targetSize: 0.8"
-                        rotation="-90 0 0"
-                        position="0 0 0"
-                        visible="false">
-          </a-gltf-model>
-        </a-entity>
-      `;
-      document.body.appendChild(sceneEl);
+  // Añadimos el contenido de la escena
+  sceneEl.innerHTML = `
+    <a-assets timeout="30000">
+      <a-asset-item id="ar-model-asset" src="./covid.glb"></a-asset-item>
+    </a-assets>
 
-      const anchor = sceneEl.querySelector('#anchor');
-      const model = sceneEl.querySelector('#ar-model');
+    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+    <a-entity light="type: ambient; intensity: 0.8;"></a-entity>
+    <a-entity light="type: directional; intensity: 0.8;" position="0 1 1"></a-entity>
 
-      anchor.addEventListener('targetFound', () => {
-        log('🎯 ¡Marcador encontrado!');
-        model.setAttribute('visible', true);
-      });
-      
-      anchor.addEventListener('targetLost', () => {
-        log('❌ Marcador perdido.');
-        model.setAttribute('visible', false);
-      });
+    <a-entity id="anchor" mindar-image-target="targetIndex: 0">
+      <a-gltf-model id="ar-model" src="#ar-model-asset" 
+                    smart-model="targetSize: 0.8"
+                    rotation="-90 0 0"
+                    position="0 0 0"
+                    visible="false">
+      </a-gltf-model>
+    </a-entity>
+  `;
 
-      addBackButton(() => {
-        const mindarSystem = sceneEl.systems['mindar-image-system'];
-        if (mindarSystem) mindarSystem.stop(); // Detener la cámara
-        sceneEl.remove(); // Eliminar la escena del DOM
-      });
-    }
+  // --- LA PARTE MÁS IMPORTANTE ---
+  // Escuchamos el evento 'loaded' para asegurarnos de que toda la escena está lista.
+  sceneEl.addEventListener('loaded', () => {
+    log('✅ Escena AR cargada. Iniciando cámara y listeners...');
+    const anchor = sceneEl.querySelector('#anchor');
+    const model = sceneEl.querySelector('#ar-model');
+
+    // Adjuntamos los listeners AHORA que sabemos que todo existe
+    anchor.addEventListener('targetFound', () => {
+      log('🎯 ¡Marcador encontrado! Mostrando modelo.');
+      model.setAttribute('visible', true);
+    });
+    
+    anchor.addEventListener('targetLost', () => {
+      log('❌ Marcador perdido. Ocultando modelo.');
+      model.setAttribute('visible', false);
+    });
+
+    // Ahora que todo está configurado, iniciamos el sistema MindAR
+    sceneEl.systems['mindar-image-system'].start();
+  });
+
+  addBackButton(() => {
+    const mindarSystem = sceneEl.systems['mindar-image-system'];
+    if (mindarSystem) mindarSystem.stop(); // Detener la cámara
+    sceneEl.remove(); // Eliminar la escena del DOM
+  });
+}
 
     // Asignar eventos a los botones
     document.getElementById('btnDemo').addEventListener('click', startDemo);
@@ -247,3 +265,4 @@
   </script>
 </body>
 </html>
+
