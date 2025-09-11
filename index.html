@@ -3,348 +3,247 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-  <title>AR (MindAR) + Demo 3D — con decoders</title>
+  <title>AR + Demo 3D [Versión Estable]</title>
 
-  <!-- Librerías locales en la RAÍZ -->
-  <script src="./aframe.min.js?v=6"></script>
-  <script src="./mindar-image-aframe.prod.js?v=6"></script>
+  <script src="./aframe.min.js"></script>
+  <script src="./mindar-image-aframe.prod.js"></script>
 
   <style>
     :root { --bg:#0b0f13; --chip:#ffffff18; }
-    html,body{margin:0;height:100vh;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;overscroll-behavior:none}
+    html,body{margin:0;height:100vh;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;overscroll-behavior:none;touch-action:none}
     #screen{position:fixed;inset:0;display:grid;place-items:center;gap:14px;background:var(--bg);color:#fff;padding:20px;text-align:center}
     .btn{padding:15px 20px;border-radius:12px;border:1px solid #ffffff26;background:var(--chip);color:#fff;font-weight:600;cursor:pointer;font-size:16px;min-width:200px}
-    .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
-    #log{position:fixed;left:12px;right:12px;bottom:12px;z-index:10;color:#0ff;background:#001014cc;padding:8px 10px;border-radius:10px;font:11px/1.3 ui-monospace,Consolas,monospace;white-space:pre-wrap;max-height:25vh;overflow:auto}
-    #demoWrap{position:fixed;inset:0;background:#ffffff;display:none}
+    #log{position:fixed;left:12px;right:12px;bottom:12px;z-index:10;color:#0ff;background:#001014cc;padding:8px 10px;border-radius:10px;font:11px/1.3 ui-monospace,Consolas,monospace;white-space:pre-wrap;max-height:25vh;overflow:auto;pointer-events:none}
+    #demoWrap{position:fixed;inset:0;background:#f5f5f5;display:none}
     a-scene{position:fixed;inset:0;width:100%;height:100%}
-    .hint{opacity:.85;font-size:13px;max-width:90%}
+    .hint{opacity:.8;font-size:13px;max-width:90%}
     .back-btn{position:fixed;top:20px;left:20px;z-index:100;padding:10px 15px;background:#000000ee;color:#fff;border:1px solid #ffffff26;border-radius:8px;cursor:pointer;font-size:16px;font-weight:600}
   </style>
 </head>
 <body>
   <div id="screen">
     <div style="font-size:20px;opacity:.9;margin-bottom:10px">🔬 AR + Demo 3D</div>
-    <div class="row">
-      <button class="btn" id="btnAR">📱 AR con Marcador</button>
-      <button class="btn" id="btnDemo">🎯 Demo 3D</button>
+    <div>
+      <button class="btn" id="btnAR">📱 Iniciar AR</button>
+      <button class="btn" id="btnDemo" style="margin-top:10px;">🎯 Iniciar Demo 3D</button>
     </div>
-    <div class="hint">AR: apunta al marcador • Demo: arrastra para rotar (2 ejes), pinza/rueda para zoom</div>
+    <div class="hint">AR: Apunta a tu marcador | Demo: Arrastra para rotar, pellizca para zoom</div>
   </div>
 
   <div id="demoWrap"></div>
   <div id="log"></div>
 
   <script>
-    // ---------- Utilidades ----------
     const logEl = document.getElementById('log');
-    const log = m => { console.log(m); logEl.textContent += (logEl.textContent?'\n':'') + m; logEl.scrollTop = logEl.scrollHeight; };
+    const log = m => { 
+      console.log(m); 
+      logEl.textContent = m + '\n' + logEl.textContent;
+    };
+    
     const isMobile = /Mobi|Android/i.test(navigator.userAgent);
     const isSecure = location.protocol.startsWith('https') || location.hostname === 'localhost';
-    if(!isSecure) log('⚠️ Requiere HTTPS para cámara');
-    if(!window.AFRAME) log('❌ A-Frame NO cargó (revisa aframe.min.js)');
+    
+    if(!isSecure) log('⚠️ Requiere HTTPS para la cámara');
+    log('Página cargada. Esperando acción...');
 
-    // Componente: centra el modelo, ajusta escala y evita culling
+    // Componente para auto-ajustar el modelo
     AFRAME.registerComponent('smart-model', {
       schema: {
-        targetSize: {type: 'number', default: 1.0},     // tamaño “en pantalla” (unidad relativa)
-        unlit: {type: 'boolean', default: false}        // forzar material básico (debug luz)
+        targetSize: {type: 'number', default: 1.0}
       },
       init(){
         this.el.addEventListener('model-loaded', () => {
           const obj = this.el.getObject3D('mesh');
-          if(!obj){ log('⚠️ No hay mesh en el modelo'); return; }
-
+          if(!obj) {
+            log('❌ Error en smart-model: No se encontró el mesh.');
+            return;
+          }
+          
           const box = new THREE.Box3().setFromObject(obj);
           const center = box.getCenter(new THREE.Vector3());
           const size = box.getSize(new THREE.Vector3());
-          const maxDim = Math.max(size.x, size.y, size.z) || 1.0;
-
-          // Centrar en (0,0,0)
+          const maxDimension = Math.max(size.x, size.y, size.z);
+          
           obj.position.sub(center);
-
-          // Escalar a targetSize
-          const scale = this.data.targetSize / maxDim;
+          
+          const scale = this.data.targetSize / maxDimension;
           obj.scale.setScalar(scale);
-
-          // Mejoras de render
-          obj.traverse(n=>{
-            if(n.isMesh){
-              n.frustumCulled = false;
-              n.castShadow = true;
-              n.receiveShadow = true;
-              if(this.data.unlit){
-                const map = n.material && n.material.map ? n.material.map : null;
-                n.material = new THREE.MeshBasicMaterial({ color: 0xffffff, map });
-              }else{
-                if(n.material) n.material.needsUpdate = true;
-              }
-            }
+          
+          obj.traverse(node => {
+            if(node.isMesh) node.frustumCulled = false;
           });
-          obj.updateMatrixWorld(true);
-
-          log(`✅ smart-model: size ${size.x.toFixed(2)}×${size.y.toFixed(2)}×${size.z.toFixed(2)} → scale ${scale.toFixed(2)}`);
+          log('✅ Modelo ajustado por smart-model.');
         });
+        this.el.addEventListener('model-error', e => log(`❌ Error cargando modelo: ${e.detail.src}`));
       }
     });
 
-    const clamp = (v,min,max)=>Math.min(max,Math.max(min,v));
-    const addBackButton = (cb)=>{
+    // Función para añadir botón de regreso
+    function addBackButton(onBack) {
       const btn = document.createElement('button');
       btn.className = 'back-btn';
-      btn.textContent = '← Menú';
-      btn.onclick = cb;
+      btn.innerHTML = '← Volver';
+      btn.onclick = () => {
+        onBack();
+        btn.remove();
+        document.getElementById('screen').style.display = 'grid';
+      };
       document.body.appendChild(btn);
-      return btn;
-    };
+    }
 
-    // ===== DEMO 3D =====
+    // --- DEMO 3D ESTABLE ---
     function startDemo(){
-      document.getElementById('screen').style.display='none';
+      document.getElementById('screen').style.display = 'none';
+      log('Iniciando Demo 3D...');
+
       const wrap = document.getElementById('demoWrap');
       wrap.style.display='block';
-
       wrap.innerHTML = `
-        <a-scene id="demoScene"
-                 background="color: #ffffff"
-                 renderer="colorManagement:true; physicallyCorrectLights:true; antialias:${isMobile?'false':'true'}; precision:${isMobile?'mediump':'highp'}"
-                 vr-mode-ui="enabled:false" device-orientation-permission-ui="enabled:false">
+        <a-scene id="demoScene" background="color: #EFEFEF" renderer="physicallyCorrectLights: true; colorManagement: true;">
           <a-assets timeout="30000">
-            <a-asset-item id="covidModel" src="./covid.glb?v=6"></a-asset-item>
+            <a-asset-item id="model-asset" src="./covid.glb"></a-asset-item>
           </a-assets>
 
-          <!-- Iluminación generosa para evitar “negros” -->
-          <a-entity light="type: ambient; intensity: 1.0"></a-entity>
-          <a-entity light="type: hemisphere; intensity: 0.9; color: #ffffff; groundColor: #777777"></a-entity>
-          <a-entity light="type: directional; intensity: 1.15" position="1 2 1"></a-entity>
+          <a-entity light="type: ambient; intensity: 0.7"></a-entity>
+          <a-entity light="type: directional; intensity: 1.0" position="2 2 1"></a-entity>
 
-          <!-- Estructura: pivot (distancia) -> rotator (rotación 2-ejes) -> model -->
-          <a-entity id="pivot" position="0 0 -1.4">
-            <a-entity id="rotator" rotation="0 0 0">
-              <a-gltf-model id="model3d"
-                src="#covidModel"
-                smart-model="targetSize: 1.2"
-                gltf-model="dracoDecoderPath: ./draco/; basisTranscoderPath: ./basis/">
-              </a-gltf-model>
-            </a-entity>
+          <a-camera position="0 0 3" look-controls="enabled: false"></a-camera>
+
+          <a-entity id="pivot">
+            <a-gltf-model src="#model-asset" smart-model="targetSize: 1.5"></a-gltf-model>
           </a-entity>
-
-          <a-entity camera="near:0.01; far:100" position="0 0 0" look-controls="enabled:false" wasd-controls="enabled:false"></a-entity>
-        </a-scene>
-      `;
-
-      const backBtn = addBackButton(()=>{
-        wrap.style.display='none';
-        document.getElementById('screen').style.display='grid';
-        backBtn.remove();
-      });
+        </a-scene>`;
 
       const scene = document.getElementById('demoScene');
-      scene.addEventListener('loaded', ()=>{
+      scene.addEventListener('loaded', () => {
         const pivot = document.getElementById('pivot');
-        const rotator = document.getElementById('rotator');
+        const camera = scene.camera.el;
         const canvas = scene.renderer.domElement;
 
-        const st = {
-          dragging:false, lastX:0, lastY:0,
-          yaw:0, pitch:0, vy:0, vx:0,
-          dist:1.4, min:0.5, max:5.0,
-          sensYaw:0.35, sensPitch:0.25
+        const state = { isDragging: false, lastX: 0, lastY: 0, lastTouchDist: 0 };
+        const sensitivity = 0.5;
+        const minZoom = 1.5, maxZoom = 8.0;
+
+        const onPointerDown = e => {
+          state.isDragging = true;
+          const pos = e.touches ? e.touches[0] : e;
+          state.lastX = pos.clientX;
+          state.lastY = pos.clientY;
         };
 
-        // Inercia y límites de pitch
-        (function tick(){
-          if(Math.abs(st.vy)>0.0005){ st.yaw += st.vy; st.vy *= 0.95; } else { st.vy=0; }
-          if(Math.abs(st.vx)>0.0005){ st.pitch += st.vx; st.vx *= 0.95; } else { st.vx=0; }
-          st.pitch = clamp(st.pitch, -80, 80);
-          rotator.setAttribute('rotation', {x:st.pitch, y:st.yaw, z:0});
-          requestAnimationFrame(tick);
-        })();
-
-        const pd = e=>{ st.dragging=true; st.lastX=e.clientX; st.lastY=e.clientY; st.vx=0; st.vy=0; };
-        const pu = ()=>{ st.dragging=false; };
-        const pm = e=>{
-          if(!st.dragging) return;
-          const dx=e.clientX-st.lastX, dy=e.clientY-st.lastY;
-          st.lastX=e.clientX; st.lastY=e.clientY;
-          st.yaw   += dx*st.sensYaw;
-          st.pitch -= dy*st.sensPitch;
-          st.vy     = dx*(st.sensYaw*0.1);
-          st.vx     = -dy*(st.sensPitch*0.1);
+        const onPointerUp = () => {
+          state.isDragging = false;
+        };
+        
+        const onPointerMove = e => {
+          if (!state.isDragging) return;
+          const pos = e.touches ? e.touches[0] : e;
+          const deltaX = pos.clientX - state.lastX;
+          const deltaY = pos.clientY - state.lastY;
+          
+          const currentRotation = pivot.getAttribute('rotation');
+          pivot.setAttribute('rotation', {
+            x: currentRotation.x - deltaY * sensitivity,
+            y: currentRotation.y + deltaX * sensitivity,
+            z: 0
+          });
+          
+          state.lastX = pos.clientX;
+          state.lastY = pos.clientY;
         };
 
-        canvas.addEventListener('pointerdown', e=>{ e.preventDefault(); pd(e); }, {passive:false});
-        canvas.addEventListener('pointerup',   e=>{ e.preventDefault(); pu(e); }, {passive:false});
-        canvas.addEventListener('pointerleave',e=>{ e.preventDefault(); pu(e); }, {passive:false});
-        canvas.addEventListener('pointermove', e=>{ e.preventDefault(); pm(e); }, {passive:false});
+        const handleZoom = (delta) => {
+          let newZ = camera.object3D.position.z + delta;
+          camera.object3D.position.z = Math.max(minZoom, Math.min(maxZoom, newZ));
+        };
 
-        // Rueda → acercar/alejar (mueve pivot en Z)
-        canvas.addEventListener('wheel', e=>{
-          e.preventDefault();
-          st.dist = clamp(st.dist + Math.sign(e.deltaY)*0.12, st.min, st.max);
-          pivot.setAttribute('position', `0 0 ${-st.dist}`);
-        }, {passive:false});
+        // Eventos de Mouse
+        canvas.addEventListener('mousedown', onPointerDown);
+        canvas.addEventListener('mouseup', onPointerUp);
+        canvas.addEventListener('mouseleave', onPointerUp);
+        canvas.addEventListener('mousemove', onPointerMove);
+        canvas.addEventListener('wheel', e => handleZoom(e.deltaY * 0.01));
 
-        // Pinch-zoom
-        let lastDist=0;
-        canvas.addEventListener('touchmove', e=>{
-          if(e.touches && e.touches.length===2){
-            e.preventDefault();
-            const [a,b]=e.touches, dx=a.clientX-b.clientX, dy=a.clientY-b.clientY;
-            const d=Math.hypot(dx,dy);
-            if(lastDist){
-              const delta=(lastDist-d)/350;
-              st.dist = clamp(st.dist + delta, st.min, st.max);
-              pivot.setAttribute('position', `0 0 ${-st.dist}`);
-            }
-            lastDist=d;
+        // Eventos Táctiles
+        canvas.addEventListener('touchstart', e => {
+          if (e.touches.length === 1) onPointerDown(e);
+          if (e.touches.length === 2) {
+            state.lastTouchDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
           }
-        }, {passive:false});
-        canvas.addEventListener('touchend', ()=>{ lastDist=0; }, {passive:false});
+        });
+        canvas.addEventListener('touchend', onPointerUp);
+        canvas.addEventListener('touchmove', e => {
+          if (e.touches.length === 1) onPointerMove(e);
+          if (e.touches.length === 2) {
+            const newDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+            handleZoom((state.lastTouchDist - newDist) * 0.02);
+            state.lastTouchDist = newDist;
+          }
+        });
+        
+        log('✅ Demo 3D listo.');
+      });
 
-        document.getElementById('covidModel').addEventListener('loaded', ()=>log('✅ Modelo DEMO cargado'));
-        document.getElementById('covidModel').addEventListener('error',  ()=>log('❌ Error cargando covid.glb (DEMO)'));
+      addBackButton(() => {
+        wrap.style.display = 'none';
+        wrap.innerHTML = ''; // Limpiar contenido para liberar memoria
       });
     }
 
-    // ===== AR (MindAR) =====
+    // --- AR ESTABLE ---
     function startAR(){
-      document.getElementById('screen').style.display='none';
-      if(!isSecure){ log('❌ Requiere HTTPS'); setTimeout(()=>document.getElementById('screen').style.display='grid',1500); return; }
+      document.getElementById('screen').style.display = 'none';
+      log('Iniciando AR... buscando marcador.');
+      
+      const sceneEl = document.createElement('a-scene');
+      sceneEl.setAttribute('mindar-image', 'imageTargetSrc: ./targets.mind; autoStart: true;');
+      sceneEl.setAttribute('renderer', 'physicallyCorrectLights: true; colorManagement: true;');
+      sceneEl.setAttribute('vr-mode-ui', 'enabled: false');
+      sceneEl.setAttribute('device-orientation-permission-ui', 'enabled: false');
 
-      const sceneHTML = `
-        <a-scene id="arScene"
-          mindar-image="imageTargetSrc: ./targets.mind; maxTrack:1; filterMinCF:0.0005; filterBeta:0.001"
-          renderer="colorManagement:true; physicallyCorrectLights:true; alpha:true; antialias:false; precision:${isMobile?'mediump':'highp'}"
-          vr-mode-ui="enabled:false" device-orientation-permission-ui="enabled:false" embedded>
-          <a-assets timeout="30000">
-            <a-asset-item id="covidModelAR" src="./covid.glb?v=6"></a-asset-item>
-          </a-assets>
+      sceneEl.innerHTML = `
+        <a-assets timeout="30000">
+          <a-asset-item id="ar-model-asset" src="./covid.glb"></a-asset-item>
+        </a-assets>
 
-          <!-- Luz abundante para evitar “negros” -->
-          <a-entity light="type: ambient; intensity: 1.0"></a-entity>
-          <a-entity light="type: hemisphere; intensity: 0.9; color: #ffffff; groundColor: #777777"></a-entity>
-          <a-entity light="type: directional; intensity: 1.1" position="1 1 1"></a-entity>
+        <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+        <a-entity light="type: ambient; intensity: 0.8;"></a-entity>
+        <a-entity light="type: directional; intensity: 0.8;" position="0 1 1"></a-entity>
 
-          <!-- anchor (MindAR) → pivotAR (escala/zoom) → rotatorAR (rotación) → model -->
-          <a-entity id="anchor" mindar-image-target="targetIndex:0">
-            <a-entity id="pivotAR" position="0 0 0" scale="1 1 1">
-              <a-entity id="rotatorAR" rotation="0 0 0">
-                <a-gltf-model id="arModel"
-                  src="#covidModelAR"
-                  smart-model="targetSize: 1.0"
-                  gltf-model="dracoDecoderPath: ./draco/; basisTranscoderPath: ./basis/"
-                  visible="false">
-                </a-gltf-model>
-              </a-entity>
-            </a-entity>
-          </a-entity>
-
-          <a-camera position="0 0 0"></a-camera>
-        </a-scene>
+        <a-entity id="anchor" mindar-image-target="targetIndex: 0">
+          <a-gltf-model id="ar-model" src="#ar-model-asset" 
+                        smart-model="targetSize: 0.8"
+                        rotation="-90 0 0"
+                        position="0 0 0"
+                        visible="false">
+          </a-gltf-model>
+        </a-entity>
       `;
-      document.body.insertAdjacentHTML('beforeend', sceneHTML);
+      document.body.appendChild(sceneEl);
 
-      const backBtn = addBackButton(()=>{
-        const s = document.getElementById('arScene'); if(s) s.remove();
-        document.getElementById('screen').style.display='grid';
-        backBtn.remove();
+      const anchor = sceneEl.querySelector('#anchor');
+      const model = sceneEl.querySelector('#ar-model');
+
+      anchor.addEventListener('targetFound', () => {
+        log('🎯 ¡Marcador encontrado!');
+        model.setAttribute('visible', true);
+      });
+      
+      anchor.addEventListener('targetLost', () => {
+        log('❌ Marcador perdido.');
+        model.setAttribute('visible', false);
       });
 
-      const scene = document.getElementById('arScene');
-      scene.addEventListener('loaded', ()=> log('✅ AR listo — apunta al marcador'));
-      scene.addEventListener('renderstart', ()=> log('📹 Cámara AR activa'));
-
-      // Mostrar/ocultar modelo según target
-      setTimeout(()=>{
-        const anchor = document.getElementById('anchor');
-        const model  = document.getElementById('arModel');
-        if(anchor && model){
-          anchor.addEventListener('targetFound', ()=>{
-            log('🎯 Marcador encontrado');
-            model.setAttribute('visible','true');
-            model.setAttribute('animation__pop','property: scale; to: 1.05 1.05 1.05; dur: 300; dir: alternate; loop: 1; easing: easeOutQuad');
-          });
-          anchor.addEventListener('targetLost', ()=>{
-            log('⚪ Marcador perdido');
-            model.setAttribute('visible','false');
-          });
-        }
-      }, 600);
-
-      // Gestos: rotar en 2 ejes (rotatorAR) y zoom (escala pivotAR)
-      scene.addEventListener('loaded', ()=>{
-        const pivot   = document.getElementById('pivotAR');    // escala (zoom)
-        const rotator = document.getElementById('rotatorAR');  // rotación
-        const canvas  = scene.renderer.domElement;
-
-        const st = {
-          dragging:false, lastX:0, lastY:0,
-          yaw:0, pitch:0, vy:0, vx:0,
-          scale:1.0, min:0.5, max:2.0,
-          sensYaw:0.35, sensPitch:0.25
-        };
-
-        (function tick(){
-          if(Math.abs(st.vy)>0.0005){ st.yaw += st.vy; st.vy *= 0.95; } else { st.vy=0; }
-          if(Math.abs(st.vx)>0.0005){ st.pitch += st.vx; st.vx *= 0.95; } else { st.vx=0; }
-          st.pitch = clamp(st.pitch, -80, 80);
-          rotator.setAttribute('rotation', {x:st.pitch, y:st.yaw, z:0});
-          requestAnimationFrame(tick);
-        })();
-
-        const pd = e=>{ st.dragging=true; st.lastX=e.clientX; st.lastY=e.clientY; st.vx=0; st.vy=0; };
-        const pu = ()=>{ st.dragging=false; };
-        const pm = e=>{
-          if(!st.dragging) return;
-          const dx=e.clientX-st.lastX, dy=e.clientY-st.lastY;
-          st.lastX=e.clientX; st.lastY=e.clientY;
-          st.yaw   += dx*st.sensYaw;
-          st.pitch -= dy*st.sensPitch;
-          st.vy     = dx*(st.sensYaw*0.1);
-          st.vx     = -dy*(st.sensPitch*0.1);
-        };
-
-        canvas.addEventListener('pointerdown', e=>{ e.preventDefault(); pd(e); }, {passive:false});
-        canvas.addEventListener('pointerup',   e=>{ e.preventDefault(); pu(e); }, {passive:false});
-        canvas.addEventListener('pointerleave',e=>{ e.preventDefault(); pu(e); }, {passive:false});
-        canvas.addEventListener('pointermove', e=>{ e.preventDefault(); pm(e); }, {passive:false});
-
-        // Pinch-zoom → escala del pivot (no mueve el ancla)
-        let lastDist=0;
-        canvas.addEventListener('touchmove', e=>{
-          if(e.touches && e.touches.length===2){
-            e.preventDefault();
-            const [a,b]=e.touches, dx=a.clientX-b.clientX, dy=a.clientY-b.clientY;
-            const d=Math.hypot(dx,dy);
-            if(lastDist){
-              const delta=(d-lastDist)/600;
-              st.scale = clamp(st.scale + delta, st.min, st.max);
-              pivot.setAttribute('scale', `${st.scale} ${st.scale} ${st.scale}`);
-            }
-            lastDist=d;
-          }
-        }, {passive:false});
-        canvas.addEventListener('touchend', ()=>{ lastDist=0; }, {passive:false});
-
-        // Rueda (desktop) → igual que pinch
-        canvas.addEventListener('wheel', e=>{
-          e.preventDefault();
-          st.scale = clamp(st.scale + (Math.sign(e.deltaY)*-0.05), st.min, st.max);
-          pivot.setAttribute('scale', `${st.scale} ${st.scale} ${st.scale}`);
-        }, {passive:false});
-
-        document.getElementById('covidModelAR').addEventListener('loaded', ()=>log('✅ Modelo AR cargado'));
-        document.getElementById('covidModelAR').addEventListener('error',  ()=>log('❌ Error cargando covid.glb (AR)'));
+      addBackButton(() => {
+        const mindarSystem = sceneEl.systems['mindar-image-system'];
+        if (mindarSystem) mindarSystem.stop(); // Detener la cámara
+        sceneEl.remove(); // Eliminar la escena del DOM
       });
     }
 
-    // Eventos UI
+    // Asignar eventos a los botones
     document.getElementById('btnDemo').addEventListener('click', startDemo);
     document.getElementById('btnAR').addEventListener('click', startAR);
-
-    // Recordatorio de archivos
-    setTimeout(()=>{ log('📁 Necesarios: aframe.min.js, mindar-image-aframe.prod.js, targets.mind, covid.glb (y opcional: draco/ y basis/)'); }, 800);
   </script>
 </body>
 </html>
