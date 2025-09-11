@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-  <title>AR (MindAR) + Demo 3D — Mobile Fixed</title>
+  <title>AR (MindAR) + Demo 3D — con decoders</title>
 
   <!-- Librerías locales en la RAÍZ -->
-  <script src="./aframe.min.js?v=4"></script>
-  <script src="./mindar-image-aframe.prod.js?v=4"></script>
+  <script src="./aframe.min.js?v=6"></script>
+  <script src="./mindar-image-aframe.prod.js?v=6"></script>
 
   <style>
     :root { --bg:#0b0f13; --chip:#ffffff18; }
@@ -16,9 +16,9 @@
     .btn{padding:15px 20px;border-radius:12px;border:1px solid #ffffff26;background:var(--chip);color:#fff;font-weight:600;cursor:pointer;font-size:16px;min-width:200px}
     .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
     #log{position:fixed;left:12px;right:12px;bottom:12px;z-index:10;color:#0ff;background:#001014cc;padding:8px 10px;border-radius:10px;font:11px/1.3 ui-monospace,Consolas,monospace;white-space:pre-wrap;max-height:25vh;overflow:auto}
-    #demoWrap{position:fixed;inset:0;background:#f5f5f5;display:none}
+    #demoWrap{position:fixed;inset:0;background:#ffffff;display:none}
     a-scene{position:fixed;inset:0;width:100%;height:100%}
-    .hint{opacity:.8;font-size:13px;max-width:90%}
+    .hint{opacity:.85;font-size:13px;max-width:90%}
     .back-btn{position:fixed;top:20px;left:20px;z-index:100;padding:10px 15px;background:#000000ee;color:#fff;border:1px solid #ffffff26;border-radius:8px;cursor:pointer;font-size:16px;font-weight:600}
   </style>
 </head>
@@ -29,7 +29,7 @@
       <button class="btn" id="btnAR">📱 AR con Marcador</button>
       <button class="btn" id="btnDemo">🎯 Demo 3D</button>
     </div>
-    <div class="hint">AR: Apunta al marcador impreso • Demo: arrastra (2 ejes) y pincha/rueda para zoom</div>
+    <div class="hint">AR: apunta al marcador • Demo: arrastra para rotar (2 ejes), pinza/rueda para zoom</div>
   </div>
 
   <div id="demoWrap"></div>
@@ -42,34 +42,43 @@
     const isMobile = /Mobi|Android/i.test(navigator.userAgent);
     const isSecure = location.protocol.startsWith('https') || location.hostname === 'localhost';
     if(!isSecure) log('⚠️ Requiere HTTPS para cámara');
-    if(!window.AFRAME) log('❌ A-Frame NO cargó');
+    if(!window.AFRAME) log('❌ A-Frame NO cargó (revisa aframe.min.js)');
 
-    // Componente: centra el modelo y desactiva frustum culling
+    // Componente: centra el modelo, ajusta escala y evita culling
     AFRAME.registerComponent('smart-model', {
-      schema: { targetSize: {type: 'number', default: 1.0} },
+      schema: {
+        targetSize: {type: 'number', default: 1.0},     // tamaño “en pantalla” (unidad relativa)
+        unlit: {type: 'boolean', default: false}        // forzar material básico (debug luz)
+      },
       init(){
         this.el.addEventListener('model-loaded', () => {
           const obj = this.el.getObject3D('mesh');
-          if(!obj){ log('⚠️ No se pudo obtener el mesh del modelo'); return; }
+          if(!obj){ log('⚠️ No hay mesh en el modelo'); return; }
+
           const box = new THREE.Box3().setFromObject(obj);
           const center = box.getCenter(new THREE.Vector3());
           const size = box.getSize(new THREE.Vector3());
           const maxDim = Math.max(size.x, size.y, size.z) || 1.0;
 
-          // centrar en origen
+          // Centrar en (0,0,0)
           obj.position.sub(center);
 
-          // escalar para que "quepa" (unidad = metros aprox. en A-Frame)
+          // Escalar a targetSize
           const scale = this.data.targetSize / maxDim;
           obj.scale.setScalar(scale);
 
-          // render tweaks
+          // Mejoras de render
           obj.traverse(n=>{
             if(n.isMesh){
               n.frustumCulled = false;
               n.castShadow = true;
               n.receiveShadow = true;
-              if(n.material) n.material.needsUpdate = true;
+              if(this.data.unlit){
+                const map = n.material && n.material.map ? n.material.map : null;
+                n.material = new THREE.MeshBasicMaterial({ color: 0xffffff, map });
+              }else{
+                if(n.material) n.material.needsUpdate = true;
+              }
             }
           });
           obj.updateMatrixWorld(true);
@@ -80,7 +89,6 @@
     });
 
     const clamp = (v,min,max)=>Math.min(max,Math.max(min,v));
-
     const addBackButton = (cb)=>{
       const btn = document.createElement('button');
       btn.className = 'back-btn';
@@ -97,20 +105,27 @@
       wrap.style.display='block';
 
       wrap.innerHTML = `
-        <a-scene id="demoScene" background="color: #ffffff"
-                 renderer="colorManagement:true; antialias:${isMobile?'false':'true'}; precision:${isMobile?'mediump':'highp'}"
+        <a-scene id="demoScene"
+                 background="color: #ffffff"
+                 renderer="colorManagement:true; physicallyCorrectLights:true; antialias:${isMobile?'false':'true'}; precision:${isMobile?'mediump':'highp'}"
                  vr-mode-ui="enabled:false" device-orientation-permission-ui="enabled:false">
           <a-assets timeout="30000">
-            <a-asset-item id="covidModel" src="./covid.glb?v=4"></a-asset-item>
+            <a-asset-item id="covidModel" src="./covid.glb?v=6"></a-asset-item>
           </a-assets>
 
-          <a-entity light="type: ambient; intensity: 0.9"></a-entity>
-          <a-entity light="type: directional; intensity: 1.0" position="1 2 1"></a-entity>
+          <!-- Iluminación generosa para evitar “negros” -->
+          <a-entity light="type: ambient; intensity: 1.0"></a-entity>
+          <a-entity light="type: hemisphere; intensity: 0.9; color: #ffffff; groundColor: #777777"></a-entity>
+          <a-entity light="type: directional; intensity: 1.15" position="1 2 1"></a-entity>
 
           <!-- Estructura: pivot (distancia) -> rotator (rotación 2-ejes) -> model -->
-          <a-entity id="pivot" position="0 0 -1.6">
+          <a-entity id="pivot" position="0 0 -1.4">
             <a-entity id="rotator" rotation="0 0 0">
-              <a-gltf-model id="model3d" src="#covidModel" smart-model="targetSize: 1.2" position="0 0 0"></a-gltf-model>
+              <a-gltf-model id="model3d"
+                src="#covidModel"
+                smart-model="targetSize: 1.2"
+                gltf-model="dracoDecoderPath: ./draco/; basisTranscoderPath: ./basis/">
+              </a-gltf-model>
             </a-entity>
           </a-entity>
 
@@ -133,11 +148,11 @@
         const st = {
           dragging:false, lastX:0, lastY:0,
           yaw:0, pitch:0, vy:0, vx:0,
-          dist:1.6, min:0.6, max:5.0,
+          dist:1.4, min:0.5, max:5.0,
           sensYaw:0.35, sensPitch:0.25
         };
 
-        // inercia + límites pitch
+        // Inercia y límites de pitch
         (function tick(){
           if(Math.abs(st.vy)>0.0005){ st.yaw += st.vy; st.vy *= 0.95; } else { st.vy=0; }
           if(Math.abs(st.vx)>0.0005){ st.pitch += st.vx; st.vx *= 0.95; } else { st.vx=0; }
@@ -163,14 +178,14 @@
         canvas.addEventListener('pointerleave',e=>{ e.preventDefault(); pu(e); }, {passive:false});
         canvas.addEventListener('pointermove', e=>{ e.preventDefault(); pm(e); }, {passive:false});
 
-        // rueda -> acercar/alejar (mueve pivot en Z)
+        // Rueda → acercar/alejar (mueve pivot en Z)
         canvas.addEventListener('wheel', e=>{
           e.preventDefault();
           st.dist = clamp(st.dist + Math.sign(e.deltaY)*0.12, st.min, st.max);
           pivot.setAttribute('position', `0 0 ${-st.dist}`);
         }, {passive:false});
 
-        // pinch-zoom
+        // Pinch-zoom
         let lastDist=0;
         canvas.addEventListener('touchmove', e=>{
           if(e.touches && e.touches.length===2){
@@ -188,6 +203,7 @@
         canvas.addEventListener('touchend', ()=>{ lastDist=0; }, {passive:false});
 
         document.getElementById('covidModel').addEventListener('loaded', ()=>log('✅ Modelo DEMO cargado'));
+        document.getElementById('covidModel').addEventListener('error',  ()=>log('❌ Error cargando covid.glb (DEMO)'));
       });
     }
 
@@ -202,17 +218,24 @@
           renderer="colorManagement:true; physicallyCorrectLights:true; alpha:true; antialias:false; precision:${isMobile?'mediump':'highp'}"
           vr-mode-ui="enabled:false" device-orientation-permission-ui="enabled:false" embedded>
           <a-assets timeout="30000">
-            <a-asset-item id="covidModelAR" src="./covid.glb?v=4"></a-asset-item>
+            <a-asset-item id="covidModelAR" src="./covid.glb?v=6"></a-asset-item>
           </a-assets>
 
-          <a-entity light="type: ambient; intensity: 0.9"></a-entity>
+          <!-- Luz abundante para evitar “negros” -->
+          <a-entity light="type: ambient; intensity: 1.0"></a-entity>
+          <a-entity light="type: hemisphere; intensity: 0.9; color: #ffffff; groundColor: #777777"></a-entity>
           <a-entity light="type: directional; intensity: 1.1" position="1 1 1"></a-entity>
 
-          <!-- anchor (MindAR) → pivotAR (escala/zoom) → rotatorAR (rotación 2-ejes) → model -->
+          <!-- anchor (MindAR) → pivotAR (escala/zoom) → rotatorAR (rotación) → model -->
           <a-entity id="anchor" mindar-image-target="targetIndex:0">
             <a-entity id="pivotAR" position="0 0 0" scale="1 1 1">
               <a-entity id="rotatorAR" rotation="0 0 0">
-                <a-gltf-model id="arModel" src="#covidModelAR" smart-model="targetSize: 0.9" position="0 0 0" visible="false"></a-gltf-model>
+                <a-gltf-model id="arModel"
+                  src="#covidModelAR"
+                  smart-model="targetSize: 1.0"
+                  gltf-model="dracoDecoderPath: ./draco/; basisTranscoderPath: ./basis/"
+                  visible="false">
+                </a-gltf-model>
               </a-entity>
             </a-entity>
           </a-entity>
@@ -232,7 +255,7 @@
       scene.addEventListener('loaded', ()=> log('✅ AR listo — apunta al marcador'));
       scene.addEventListener('renderstart', ()=> log('📹 Cámara AR activa'));
 
-      // Mostrar/ocultar modelo al detectar el target
+      // Mostrar/ocultar modelo según target
       setTimeout(()=>{
         const anchor = document.getElementById('anchor');
         const model  = document.getElementById('arModel');
@@ -240,7 +263,6 @@
           anchor.addEventListener('targetFound', ()=>{
             log('🎯 Marcador encontrado');
             model.setAttribute('visible','true');
-            // pequeño “pop” para confirmar
             model.setAttribute('animation__pop','property: scale; to: 1.05 1.05 1.05; dur: 300; dir: alternate; loop: 1; easing: easeOutQuad');
           });
           anchor.addEventListener('targetLost', ()=>{
@@ -250,15 +272,16 @@
         }
       }, 600);
 
-      // Gestos en AR: rotamos rotatorAR y escalamos pivotAR (el anclaje no se toca)
+      // Gestos: rotar en 2 ejes (rotatorAR) y zoom (escala pivotAR)
       scene.addEventListener('loaded', ()=>{
         const pivot   = document.getElementById('pivotAR');    // escala (zoom)
-        const rotator = document.getElementById('rotatorAR');  // rotación 2-ejes
+        const rotator = document.getElementById('rotatorAR');  // rotación
         const canvas  = scene.renderer.domElement;
+
         const st = {
           dragging:false, lastX:0, lastY:0,
           yaw:0, pitch:0, vy:0, vx:0,
-          scale:1.0, min:0.4, max:2.0,
+          scale:1.0, min:0.5, max:2.0,
           sensYaw:0.35, sensPitch:0.25
         };
 
@@ -287,7 +310,7 @@
         canvas.addEventListener('pointerleave',e=>{ e.preventDefault(); pu(e); }, {passive:false});
         canvas.addEventListener('pointermove', e=>{ e.preventDefault(); pm(e); }, {passive:false});
 
-        // pinch-zoom → escala del pivot (sin mover el ancla)
+        // Pinch-zoom → escala del pivot (no mueve el ancla)
         let lastDist=0;
         canvas.addEventListener('touchmove', e=>{
           if(e.touches && e.touches.length===2){
@@ -304,7 +327,7 @@
         }, {passive:false});
         canvas.addEventListener('touchend', ()=>{ lastDist=0; }, {passive:false});
 
-        // rueda (desktop) → escala igual
+        // Rueda (desktop) → igual que pinch
         canvas.addEventListener('wheel', e=>{
           e.preventDefault();
           st.scale = clamp(st.scale + (Math.sign(e.deltaY)*-0.05), st.min, st.max);
@@ -312,7 +335,7 @@
         }, {passive:false});
 
         document.getElementById('covidModelAR').addEventListener('loaded', ()=>log('✅ Modelo AR cargado'));
-        document.getElementById('covidModelAR').addEventListener('error', ()=>log('❌ Error cargando covid.glb (AR)'));
+        document.getElementById('covidModelAR').addEventListener('error',  ()=>log('❌ Error cargando covid.glb (AR)'));
       });
     }
 
@@ -321,7 +344,7 @@
     document.getElementById('btnAR').addEventListener('click', startAR);
 
     // Recordatorio de archivos
-    setTimeout(()=>{ log('📁 Necesarios: aframe.min.js, mindar-image-aframe.prod.js, targets.mind, covid.glb'); }, 800);
+    setTimeout(()=>{ log('📁 Necesarios: aframe.min.js, mindar-image-aframe.prod.js, targets.mind, covid.glb (y opcional: draco/ y basis/)'); }, 800);
   </script>
 </body>
 </html>
