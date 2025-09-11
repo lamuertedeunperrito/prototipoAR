@@ -112,101 +112,90 @@
 
     // ---------- DEMO 3D ----------
     function startDemo(){
-      document.getElementById('screen').style.display = 'none';
-      log('Iniciando Demo 3D...');
+      document.getElementById('screen').style.display='none';
+      log('Iniciando Demo 3D…');
 
       const wrap = document.getElementById('demoWrap');
       wrap.style.display='block';
       wrap.innerHTML = `
         <a-scene id="demoScene" background="color: #EFEFEF" renderer="physicallyCorrectLights: true; colorManagement: true;">
           <a-assets timeout="30000">
-            <a-asset-item id="model-asset" src="./covid.glb"></a-asset-item>
+            <a-asset-item id="model-asset" src="./covid.glb?v=10"></a-asset-item>
           </a-assets>
 
-          <a-entity light="type: ambient; intensity: 0.7"></a-entity>
-          <a-entity light="type: directional; intensity: 1.0" position="2 2 1"></a-entity>
+          <a-entity light="type: ambient; intensity: 0.9"></a-entity>
+          <a-entity light="type: hemisphere; intensity: 0.9; color: #ffffff; groundColor: #666666"></a-entity>
+          <a-entity light="type: directional; intensity: 1.2" position="2 2 1"></a-entity>
 
-          <a-camera position="0 0 3" look-controls="enabled: false"></a-camera>
+          <a-camera id="demoCam" position="0 0 3" look-controls="enabled: false"></a-camera>
 
-          <a-entity id="pivot">
-            <a-gltf-model src="#model-asset" smart-model="targetSize: 1.5"></a-gltf-model>
+          <a-entity id="pivot" position="0 0 0">
+            <a-gltf-model src="#model-asset" smart-model="targetSize: 1.6"></a-gltf-model>
           </a-entity>
         </a-scene>`;
 
       const scene = document.getElementById('demoScene');
       scene.addEventListener('loaded', () => {
         const pivot = document.getElementById('pivot');
-        const camera = scene.camera.el;
+        const cam = document.getElementById('demoCam');
         const canvas = scene.renderer.domElement;
 
-        const state = { isDragging: false, lastX: 0, lastY: 0, lastTouchDist: 0 };
-        const sensitivity = 0.5;
-        const minZoom = 1.5, maxZoom = 8.0;
+        const state = { drag:false, lx:0, ly:0, lastTouchDist:0 };
+        const sens=0.5, minZ=1.2, maxZ=8;
 
-        const onPointerDown = e => {
-          state.isDragging = true;
-          const pos = e.touches ? e.touches[0] : e;
-          state.lastX = pos.clientX;
-          state.lastY = pos.clientY;
+        const down = e=>{ state.drag=true; const p=e.touches?e.touches[0]:e; state.lx=p.clientX; state.ly=p.clientY; };
+        const up   = ()=>{ state.drag=false; };
+        const move = e=>{
+          if(!state.drag) return;
+          const p=e.touches?e.touches[0]:e;
+          const dx=p.clientX-state.lx, dy=p.clientY-state.ly;
+          const r=pivot.getAttribute('rotation');
+          pivot.setAttribute('rotation', {x:r.x - dy*sens, y:r.y + dx*sens, z:0});
+          state.lx=p.clientX; state.ly=p.clientY;
         };
 
-        const onPointerUp = () => {
-          state.isDragging = false;
-        };
-        
-        const onPointerMove = e => {
-          if (!state.isDragging) return;
-          const pos = e.touches ? e.touches[0] : e;
-          const deltaX = pos.clientX - state.lastX;
-          const deltaY = pos.clientY - state.lastY;
-          
-          const currentRotation = pivot.getAttribute('rotation');
-          pivot.setAttribute('rotation', {
-            x: currentRotation.x - deltaY * sensitivity,
-            y: currentRotation.y + deltaX * sensitivity,
-            z: 0
-          });
-          
-          state.lastX = pos.clientX;
-          state.lastY = pos.clientY;
+        const zoom = dz=>{
+          const z = clamp(cam.object3D.position.z + dz, minZ, maxZ);
+          cam.object3D.position.z = z;
         };
 
-        const handleZoom = (delta) => {
-          let newZ = camera.object3D.position.z + delta;
-          camera.object3D.position.z = Math.max(minZoom, Math.min(maxZoom, newZ));
-        };
+        canvas.addEventListener('mousedown', down);
+        canvas.addEventListener('mouseup', up);
+        canvas.addEventListener('mouseleave', up);
+        canvas.addEventListener('mousemove', move);
+        canvas.addEventListener('wheel', e=>zoom(e.deltaY*0.01));
 
-        // Eventos de Mouse
-        canvas.addEventListener('mousedown', onPointerDown);
-        canvas.addEventListener('mouseup', onPointerUp);
-        canvas.addEventListener('mouseleave', onPointerUp);
-        canvas.addEventListener('mousemove', onPointerMove);
-        canvas.addEventListener('wheel', e => handleZoom(e.deltaY * 0.01));
-
-        // Eventos Táctiles
-        canvas.addEventListener('touchstart', e => {
-          if (e.touches.length === 1) onPointerDown(e);
-          if (e.touches.length === 2) {
-            state.lastTouchDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+        canvas.addEventListener('touchstart', e=>{
+          if(e.touches.length===1) down(e);
+          if(e.touches.length===2){
+            state.lastTouchDist = Math.hypot(
+              e.touches[0].pageX - e.touches[1].pageX,
+              e.touches[0].pageY - e.touches[1].pageY
+            );
           }
-        });
-        canvas.addEventListener('touchend', onPointerUp);
-        canvas.addEventListener('touchmove', e => {
-          if (e.touches.length === 1) onPointerMove(e);
-          if (e.touches.length === 2) {
-            const newDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
-            handleZoom((state.lastTouchDist - newDist) * 0.02);
-            state.lastTouchDist = newDist;
+        }, {passive:false});
+        canvas.addEventListener('touchend', up, {passive:false});
+        canvas.addEventListener('touchmove', e=>{
+          if(e.touches.length===1){ move(e); }
+          if(e.touches.length===2){
+            e.preventDefault();
+            const d = Math.hypot(
+              e.touches[0].pageX - e.touches[1].pageX,
+              e.touches[0].pageY - e.touches[1].pageY
+            );
+            if(state.lastTouchDist){
+              zoom((state.lastTouchDist - d) * 0.02);
+            }
+            state.lastTouchDist = d;
           }
-        });
-        
+        }, {passive:false});
+
+        document.getElementById('model-asset').addEventListener('loaded', ()=>log('✅ DEMO: modelo cargado'));
+        document.getElementById('model-asset').addEventListener('error',  ()=>log('❌ DEMO: error GLB'));
         log('✅ Demo 3D listo.');
       });
 
-      addBackButton(() => {
-        wrap.style.display = 'none';
-        wrap.innerHTML = ''; // Limpiar contenido para liberar memoria
-      });
+      addBackButton(()=>{ wrap.style.display='none'; wrap.innerHTML=''; });
     }
 
     // ---------- AR (MindAR) ----------
