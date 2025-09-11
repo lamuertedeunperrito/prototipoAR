@@ -3,21 +3,33 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-    <title>AR + Demo 3D [Versión Estable]</title>
+    <title>AR + Demo 3D [Versión Corregida]</title>
     <script src="./aframe.min.js"></script>
     <script src="./mindar-image-aframe.prod.js"></script>
     <style>
         :root { --bg:#0b0f13; --chip:#ffffff18; }
         html,body{margin:0;height:100vh;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;overscroll-behavior:none;touch-action:none}
-        #screen{position:fixed;inset:0;display:grid;place-items:center;gap:14px;background:var(--bg);color:#fff;padding:20px;text-align:center}
+        #screen{position:fixed;inset:0;display:grid;place-items:center;gap:14px;background:var(--bg);color:#fff;padding:20px;text-align:center;z-index:100}
         .btn{padding:15px 20px;border-radius:12px;border:1px solid #ffffff26;background:var(--chip);color:#fff;font-weight:600;cursor:pointer;font-size:16px;min-width:200px}
         #log{position:fixed;left:12px;right:12px;bottom:12px;z-index:10;color:#0ff;background:#001014cc;padding:8px 10px;border-radius:10px;font:11px/1.3 ui-monospace,Consolas,monospace;white-space:pre-wrap;max-height:25vh;overflow:auto;pointer-events:none}
-        #demoWrap{position:fixed;inset:0;background:#f5f5f5;display:none}
+        #demoWrap{position:fixed;inset:0;background:#f5f5f5;display:none;z-index:50}
         a-scene{position:fixed;inset:0;width:100%;height:100%}
         .hint{opacity:.8;font-size:13px;max-width:90%}
         .back-btn{position:fixed;top:20px;left:20px;z-index:100;padding:10px 15px;background:#000000ee;color:#fff;border:1px solid #ffffff26;border-radius:8px;cursor:pointer;font-size:16px;font-weight:600}
         .ar-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);color:white;display:flex;justify-content:center;align-items:center;z-index:99;flex-direction:column;gap:20px}
         .ar-instructions{text-align:center;max-width:80%;font-size:18px}
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 2s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -31,7 +43,7 @@
     </div>
 
     <div id="demoWrap"></div>
-    <div id="log"></div>
+    <div id="log">Página cargada. Esperando acción...</div>
 
     <script>
         const logEl = document.getElementById('log');
@@ -41,41 +53,95 @@
         };
         
         const isMobile = /Mobi|Android/i.test(navigator.userAgent);
-        const isSecure = location.protocol.startsWith('https') || location.hostname === 'localhost';
+        const isSecure = location.protocol.startsWith('https') || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
         
-        if(!isSecure) log('⚠️ Requiere HTTPS para la cámara');
-        log('Página cargada. Esperando acción...');
+        if(!isSecure) log('⚠️ Requiere HTTPS para la cámara (o localhost)');
+        if(isMobile) log('📱 Dispositivo móvil detectado');
         
-        // Componente para auto-ajustar el modelo
+        // Componente para auto-ajustar el modelo - VERSIÓN CORREGIDA
         AFRAME.registerComponent('smart-model', {
             schema: {
                 targetSize: {type: 'number', default: 1.0}
             },
-            init(){
+            init() {
                 this.el.addEventListener('model-loaded', () => {
-                    const obj = this.el.getObject3D('mesh');
-                    if(!obj) {
-                        log('❌ Error en smart-model: No se encontró el mesh.');
-                        return;
-                    }
-                    
-                    const box = new THREE.Box3().setFromObject(obj);
-                    const center = box.getCenter(new THREE.Vector3());
-                    const size = box.getSize(new THREE.Vector3());
-                    const maxDimension = Math.max(size.x, size.y, size.z);
-                    
-                    obj.position.sub(center);
-                    const scale = this.data.targetSize / maxDimension;
-                    obj.scale.setScalar(scale);
-                    
-                    obj.traverse(node => {
-                        if(node.isMesh) node.frustumCulled = false;
-                    });
-                    
-                    log('✅ Modelo ajustado por smart-model.');
+                    // Pequeña demora para asegurar que el modelo esté completamente cargado
+                    setTimeout(() => {
+                        const obj = this.el.getObject3D('mesh');
+                        if (!obj) {
+                            log('❌ Error: No se pudo obtener el objeto 3D del modelo');
+                            return;
+                        }
+                        
+                        // Forzar la actualización de la matriz mundial
+                        obj.updateMatrixWorld(true);
+                        
+                        // Calcular bounding box de forma más robusta
+                        const box = new THREE.Box3();
+                        
+                        // Asegurarse de que el modelo tiene geometría
+                        if (obj.children.length > 0) {
+                            box.setFromObject(obj);
+                        } else {
+                            // Si no tiene hijos, intentar con el objeto mismo
+                            if (obj.geometry) {
+                                if (obj.geometry.boundingBox === null) {
+                                    obj.geometry.computeBoundingBox();
+                                }
+                                box.copy(obj.geometry.boundingBox);
+                                // Aplicar la matriz mundial para obtener la caja correcta
+                                box.applyMatrix4(obj.matrixWorld);
+                            } else {
+                                log('⚠️ Modelo sin geometría detectable, usando valores por defecto');
+                                // Establecer valores por defecto
+                                obj.scale.set(0.5, 0.5, 0.5);
+                                return;
+                            }
+                        }
+                        
+                        if (box.isEmpty()) {
+                            log('⚠️ Bounding box vacío, usando escala por defecto');
+                            obj.scale.set(0.5, 0.5, 0.5);
+                            return;
+                        }
+                        
+                        const center = box.getCenter(new THREE.Vector3());
+                        const size = box.getSize(new THREE.Vector3());
+                        
+                        // Validar que los valores sean números válidos
+                        if (isNaN(size.x) || isNaN(size.y) || isNaN(size.z)) {
+                            log('❌ Dimensiones del modelo no válidas, usando escala por defecto');
+                            obj.scale.set(0.5, 0.5, 0.5);
+                            return;
+                        }
+                        
+                        const maxDimension = Math.max(size.x, size.y, size.z);
+                        
+                        // Centrar modelo
+                        obj.position.x = -center.x;
+                        obj.position.y = -center.y;
+                        obj.position.z = -center.z;
+                        
+                        // Escalar para que quepa bien en pantalla
+                        const scale = this.data.targetSize / maxDimension;
+                        obj.scale.set(scale, scale, scale);
+                        
+                        obj.traverse(node => {
+                            if (node.isMesh) {
+                                node.frustumCulled = false;
+                                if (node.material) {
+                                    node.material.needsUpdate = true;
+                                }
+                            }
+                        });
+                        
+                        log(`✅ Modelo ajustado: ${size.x.toFixed(2)}×${size.y.toFixed(2)}×${size.z.toFixed(2)} (escala: ${scale.toFixed(2)})`);
+                    }, 100);
                 });
                 
-                this.el.addEventListener('model-error', e => log(`❌ Error cargando modelo: ${e.detail.src}`));
+                this.el.addEventListener('model-error', e => {
+                    log(`❌ Error cargando modelo: ${e.detail ? e.detail.src : 'Origen desconocido'}`);
+                });
             }
         });
         
@@ -90,6 +156,7 @@
                 document.getElementById('screen').style.display = 'grid';
             };
             document.body.appendChild(btn);
+            return btn;
         }
         
         // --- DEMO 3D ESTABLE ---
@@ -100,7 +167,8 @@
             const wrap = document.getElementById('demoWrap');
             wrap.style.display='block';
             wrap.innerHTML = `
-                <a-scene id="demoScene" background="color: #EFEFEF" renderer="physicallyCorrectLights: true; colorManagement: true;">
+                <a-scene id="demoScene" background="color: #EFEFEF" 
+                    renderer="colorManagement: true; physicallyCorrectLights: true;">
                     <a-assets timeout="30000">
                         <a-asset-item id="model-asset" src="./covid.glb"></a-asset-item>
                     </a-assets>
@@ -108,9 +176,9 @@
                     <a-entity light="type: ambient; intensity: 0.7"></a-entity>
                     <a-entity light="type: directional; intensity: 1.0" position="2 2 1"></a-entity>
                     
-                    <a-camera position="0 0 3" look-controls="enabled: false"></a-camera>
+                    <a-camera position="0 1.6 3" look-controls="enabled: false"></a-camera>
                     
-                    <a-entity id="pivot">
+                    <a-entity id="pivot" position="0 0 -3">
                         <a-gltf-model src="#model-asset" smart-model="targetSize: 1.5"></a-gltf-model>
                     </a-entity>
                 </a-scene>
@@ -119,8 +187,8 @@
             const scene = document.getElementById('demoScene');
             scene.addEventListener('loaded', () => {
                 const pivot = document.getElementById('pivot');
-                const camera = scene.camera.el;
-                const canvas = scene.renderer.domElement;
+                const camera = document.querySelector('#demoScene a-camera');
+                const canvas = scene.canvas;
                 
                 const state = {
                     isDragging: false,
@@ -162,8 +230,9 @@
                 };
                 
                 const handleZoom = (delta) => {
-                    let newZ = camera.object3D.position.z + delta;
-                    camera.object3D.position.z = Math.max(minZoom, Math.min(maxZoom, newZ));
+                    let newZ = parseFloat(pivot.getAttribute('position').z) - delta;
+                    newZ = Math.max(-maxZoom, Math.min(-minZoom, newZ));
+                    pivot.setAttribute('position', `0 0 ${newZ}`);
                 };
                 
                 // Eventos de Mouse
@@ -196,14 +265,14 @@
             
             addBackButton(() => {
                 wrap.style.display = 'none';
-                wrap.innerHTML = ''; // Limpiar contenido para liberar memoria
+                wrap.innerHTML = '';
             });
         }
         
         // --- AR CORREGIDO ---
         function startAR(){
             document.getElementById('screen').style.display = 'none';
-            log('Iniciando AR... buscando marcador.');
+            log('Iniciando AR...');
             
             // Crear overlay de instrucciones
             const overlay = document.createElement('div');
@@ -214,13 +283,13 @@
                     <p>Permite el acceso a la cámara cuando se solicite</p>
                     <p>Apunta hacia tu marcador impreso</p>
                 </div>
-                <div class="ar-loading">Cargando...</div>
+                <div class="loading-spinner"></div>
             `;
             document.body.appendChild(overlay);
             
             // Crear la escena AR
             const sceneEl = document.createElement('a-scene');
-            sceneEl.setAttribute('mindar-image', 'imageTargetSrc: ./targets.mind; autoStart: true; uiScanning: yes;');
+            sceneEl.setAttribute('mindar-image', 'imageTargetSrc: ./targets.mind; autoStart: true; uiScanning: no; uiLoading: no; uiError: no;');
             sceneEl.setAttribute('renderer', 'colorManagement: true; alpha: true;');
             sceneEl.setAttribute('vr-mode-ui', 'enabled: false');
             sceneEl.setAttribute('device-orientation-permission-ui', 'enabled: false');
@@ -234,11 +303,11 @@
                 <a-camera position="0 0 0" active="true" look-controls="enabled: false"></a-camera>
                 
                 <a-entity light="type: ambient; color: #FFF; intensity: 0.6"></a-entity>
-                <a-entity light="type: directional; color: #FFF; intensity: 0.8; position: 0 2 1"></a-entity>
+                <a-entity light="type: directional; color: #FFF; intensity: 0.8" position="1 1 0"></a-entity>
                 
-                <a-entity id="anchor" mindar-image-target="targetIndex: 0">
-                    <a-gltf-model id="ar-model" src="#ar-model-asset" smart-model="targetSize: 0.8" 
-                                  rotation="0 0 0" position="0 0 0" scale="1 1 1" visible="false">
+                <a-entity mindar-image-target="targetIndex: 0">
+                    <a-gltf-model src="#ar-model-asset" smart-model="targetSize: 0.8" 
+                                position="0 0 0" rotation="0 0 0" scale="1 1 1" visible="true">
                     </a-gltf-model>
                 </a-entity>
             `;
@@ -247,63 +316,33 @@
             
             // Eventos de la escena AR
             sceneEl.addEventListener('loaded', function() {
-                log('Escena AR cargada correctamente.');
+                log('✅ Escena AR cargada correctamente.');
                 setTimeout(() => {
                     overlay.style.display = 'none';
                 }, 2000);
             });
             
             sceneEl.addEventListener('renderstart', function() {
-                log('Renderizado AR iniciado. Cámara activa.');
+                log('✅ Renderizado AR iniciado. Cámara activa.');
             });
             
-            // Obtener referencia al modelo y al anchor
-            const anchor = document.querySelector('#anchor');
-            const model = document.querySelector('#ar-model');
+            // Manejar eventos de target found/lost
+            sceneEl.addEventListener('targetFound', event => {
+                log('🎯 ¡Marcador encontrado!');
+            });
             
-            if (anchor) {
-                anchor.addEventListener('targetFound', event => {
-                    log('🎯 ¡Marcador encontrado!');
-                    if (model) {
-                        model.setAttribute('visible', 'true');
-                        // Pequeña animación de confirmación
-                        model.setAttribute('animation', {
-                            property: 'scale',
-                            from: '0.5 0.5 0.5',
-                            to: '1 1 1',
-                            dur: 500,
-                            easing: 'easeOutElastic'
-                        });
-                    }
-                });
-                
-                anchor.addEventListener('targetLost', event => {
-                    log('Marcador perdido.');
-                    if (model) {
-                        model.setAttribute('visible', 'false');
-                    }
-                });
-            }
-            
-            if (model) {
-                model.addEventListener('model-loaded', () => {
-                    log('Modelo 3D cargado correctamente en AR.');
-                });
-                
-                model.addEventListener('model-error', (e) => {
-                    log('❌ Error al cargar el modelo 3D en AR.');
-                    console.error('Error details:', e.detail);
-                });
-            }
+            sceneEl.addEventListener('targetLost', event => {
+                log('Marcador perdido.');
+            });
             
             // Manejar posibles errores
             sceneEl.addEventListener('error', (e) => {
-                log('❌ Error en la escena AR: ' + e.detail.message);
+                log('❌ Error en la escena AR: ' + (e.detail ? e.detail.message : 'Error desconocido'));
                 overlay.innerHTML = '<div class="ar-instructions"><h2>Error al cargar AR</h2><p>Verifica la consola para más detalles</p></div>';
             });
             
             // Botón para volver
-            addBackButton(() => {
+            const backBtn = addBackButton(() => {
                 try {
                     const mindarSystem = sceneEl.systems['mindar-image-system'];
                     if (mindarSystem) {
@@ -315,7 +354,9 @@
                 }
                 
                 sceneEl.parentNode.removeChild(sceneEl);
-                overlay.parentNode.removeChild(overlay);
+                if (overlay.parentNode) {
+                    overlay.parentNode.removeChild(overlay);
+                }
             });
         }
         
