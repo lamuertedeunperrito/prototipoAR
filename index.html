@@ -99,7 +99,7 @@
                     });
 
                     obj.updateMatrixWorld(true);
-                    log(`✅ Modelo: ${size.x.toFixed(1)}×${size.y.toFixed(1)}×${size.z.toFixed(1)} → escala: ${scale.toFixed(2)}`);
+                    log(`✅ Modelo centrado: ${size.x.toFixed(1)}×${size.y.toFixed(1)}×${size.z.toFixed(1)} → escala: ${scale.toFixed(2)}`);
                 });
             },
             schema: {
@@ -137,9 +137,10 @@
                         <a-asset-item id="covidModel" src="./covid.glb"></a-asset-item>
                     </a-assets>
 
-                    <a-entity light="type: ambient; intensity: 0.7"></a-entity>
-                    <a-entity light="type: directional; intensity: 1.0" position="2 3 2"></a-entity>
-                    <a-entity light="type: directional; intensity: 0.4" position="-1 -1 -1"></a-entity>
+                    <a-entity light="type: ambient; intensity: 0.7; color: #FFFFFF"></a-entity>
+                    <a-entity light="type: directional; intensity: 0.8; color: #FFFFFF" position="2 5 5"></a-entity>
+                    <a-entity light="type: directional; intensity: 0.4; color: #FFFFFF" position="-2 3 0"></a-entity>
+                    <a-entity light="type: hemisphere; intensity: 0.5; groundColor: #808080; color: #FFFFFF"></a-entity>
 
                     <!-- Cámara posicionada para ver el modelo centrado -->
                     <a-camera id="demoCamera" position="0 1.6 0"
@@ -357,8 +358,8 @@
                         <a-asset-item id="covidModelAR" src="./covid.glb"></a-asset-item>
                     </a-assets>
 
-                    <a-entity light="type: ambient; intensity: 0.8"></a-entity>
-                    <a-entity light="type: directional; intensity: 1.2" position="0 1 1"></a-entity>
+                    <a-entity light="type: ambient; intensity: 0.8; color: #FFFFFF"></a-entity>
+                    <a-entity light="type: directional; intensity: 1.2; color: #FFFFFF" position="0 1 1"></a-entity>
 
                     <a-entity id="anchor" mindar-image-target="targetIndex: 0">
                         <!-- Modelo más grande y bien posicionado -->
@@ -435,6 +436,14 @@
                     modelAsset.addEventListener('error', (e) => {
                         log('❌ Error modelo AR: verifica covid.glb');
                         console.error('Model loading error:', e);
+                    });
+                }
+
+                // También verificamos el modelo directamente
+                const modelElement = document.getElementById('arModel');
+                if (modelElement) {
+                    modelElement.addEventListener('model-loaded', () => {
+                        log('✅ Modelo AR procesado');
                     });
                 }
             }, 500);
