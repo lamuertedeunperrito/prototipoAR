@@ -1,452 +1,307 @@
 <!doctype html>
 <html lang="es">
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-    <title>AR + Demo 3D [Solución Completa]</title>
-    <script src="./aframe.min.js"></script>
-    <script src="./mindar-image-aframe.prod.js"></script>
-    <style>
-        :root { --bg:#0b0f13; --chip:#ffffff18; }
-        html,body{margin:0;height:100vh;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;overscroll-behavior:none;touch-action:none}
-        #screen{position:fixed;inset:0;display:grid;place-items:center;gap:14px;background:var(--bg);color:#fff;padding:20px;text-align:center;z-index:100}
-        .btn{padding:15px 20px;border-radius:12px;border:1px solid #ffffff26;background:var(--chip);color:#fff;font-weight:600;cursor:pointer;font-size:16px;min-width:200px}
-        #log{position:fixed;left:12px;right:12px;bottom:12px;z-index:10;color:#0ff;background:#001014cc;padding:8px 10px;border-radius:10px;font:11px/1.3 ui-monospace,Consolas,monospace;white-space:pre-wrap;max-height:25vh;overflow:auto;pointer-events:none}
-        #demoWrap{position:fixed;inset:0;background:#f5f5f5;display:none;z-index:50}
-        a-scene{position:fixed;inset:0;width:100%;height:100%}
-        .hint{opacity:.8;font-size:13px;max-width:90%}
-        .back-btn{position:fixed;top:20px;left:20px;z-index:100;padding:10px 15px;background:#000000ee;color:#fff;border:1px solid #ffffff26;border-radius:8px;cursor:pointer;font-size:16px;font-weight:600}
-        .ar-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);color:white;display:flex;justify-content:center;align-items:center;z-index:99;flex-direction:column;gap:20px}
-        .ar-instructions{text-align:center;max-width:80%;font-size:18px}
-        .loading-spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #3498db;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 2s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+  <title>AR + Demo 3D [Solución Completa]</title>
+
+  <!-- Librerías locales -->
+  <script src="./aframe.min.js"></script>
+  <script src="./mindar-image-aframe.prod.js"></script>
+
+  <style>
+    :root { --bg:#0b0f13; --chip:#ffffff18; }
+    html,body{margin:0;height:100vh;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;overscroll-behavior:none;touch-action:none}
+    #screen{position:fixed;inset:0;display:grid;place-items:center;gap:14px;background:var(--bg);color:#fff;padding:20px;text-align:center;z-index:100}
+    .btn{padding:15px 20px;border-radius:12px;border:1px solid #ffffff26;background:var(--chip);color:#fff;font-weight:600;cursor:pointer;font-size:16px;min-width:200px}
+    #log{position:fixed;left:12px;right:12px;bottom:12px;z-index:10;color:#0ff;background:#001014cc;padding:8px 10px;border-radius:10px;font:11px/1.3 ui-monospace,Consolas,monospace;white-space:pre-wrap;max-height:25vh;overflow:auto;pointer-events:none}
+    #demoWrap{position:fixed;inset:0;background:#f5f5f5;display:none;z-index:50}
+    a-scene{position:fixed;inset:0;width:100%;height:100%}
+    .hint{opacity:.8;font-size:13px;max-width:90%}
+    .back-btn{position:fixed;top:20px;left:20px;z-index:100;padding:10px 15px;background:#000000ee;color:#fff;border:1px solid #ffffff26;border-radius:8px;cursor:pointer;font-size:16px;font-weight:600}
+    .ar-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);color:white;display:flex;justify-content:center;align-items:center;z-index:99;flex-direction:column;gap:20px}
+    .ar-instructions{text-align:center;max-width:80%;font-size:18px}
+    .loading-spinner{border:4px solid #f3f3f3;border-top:4px solid #3498db;border-radius:50%;width:40px;height:40px;animation:spin 2s linear infinite}
+    @keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
+  </style>
 </head>
 <body>
-    <div id="screen">
-        <div style="font-size:20px;opacity:.9;margin-bottom:10px">🔬 AR + Demo 3D</div>
-        <div>
-            <button class="btn" id="btnAR">📱 Iniciar AR</button>
-            <button class="btn" id="btnDemo" style="margin-top:10px;">🎯 Iniciar Demo 3D</button>
-        </div>
-        <div class="hint">AR: Apunta a tu marcador | Demo: Arrastra para rotar, pellizca para zoom</div>
+  <div id="screen">
+    <div style="font-size:20px;opacity:.9;margin-bottom:10px">🔬 AR + Demo 3D</div>
+    <div>
+      <button class="btn" id="btnAR">📱 Iniciar AR</button>
+      <button class="btn" id="btnDemo" style="margin-top:10px;">🎯 Iniciar Demo 3D</button>
     </div>
+    <div class="hint">AR: Apunta a tu marcador | Demo: Arrastra para rotar, pellizca/rueda para zoom</div>
+  </div>
 
-    <div id="demoWrap"></div>
-    <div id="log">Página cargada. Esperando acción...</div>
+  <div id="demoWrap"></div>
+  <div id="log">Página cargada. Esperando acción...</div>
 
-    <script>
-        const logEl = document.getElementById('log');
-        const log = m => {
-            console.log(m);
-            logEl.textContent = m + '\n' + logEl.textContent;
-        };
-        
-        const isMobile = /Mobi|Android/i.test(navigator.userAgent);
-        const isSecure = location.protocol.startsWith('https') || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-        
-        if(!isSecure) log('⚠️ Requiere HTTPS para la cámara (o localhost)');
-        if(isMobile) log('📱 Dispositivo móvil detectado');
-        
-        // Componente para auto-ajustar el modelo - VERSIÓN MEJORADA
-        AFRAME.registerComponent('smart-model', {
-            schema: {
-                targetSize: {type: 'number', default: 1.0}
-            },
-            init() {
-                this.modelLoaded = false;
-                this.adjustAttempts = 0;
-                this.maxAttempts = 10;
-                
-                this.el.addEventListener('model-loaded', () => {
-                    log('Modelo cargado, iniciando ajuste...');
-                    this.modelLoaded = true;
-                    this.tryToAdjustModel();
-                });
-                
-                this.el.addEventListener('model-error', (e) => {
-                    log(`❌ Error cargando modelo: ${e.detail ? e.detail.src : 'Origen desconocido'}`);
-                });
-            },
-            
-            tryToAdjustModel() {
-                if (!this.modelLoaded || this.adjustAttempts >= this.maxAttempts) return;
-                
-                this.adjustAttempts++;
-                
-                const obj = this.el.getObject3D('mesh');
-                if (!obj) {
-                    setTimeout(() => this.tryToAdjustModel(), 200);
-                    return;
-                }
-                
-                // Forzar actualización de matrices
-                obj.updateMatrixWorld(true);
-                
-                // Esperar a que la geometría esté disponible
-                if (obj.children.length === 0 && !obj.geometry) {
-                    setTimeout(() => this.tryToAdjustModel(), 200);
-                    return;
-                }
-                
-                this.adjustModel();
-            },
-            
-            adjustModel() {
-                const obj = this.el.getObject3D('mesh');
-                if (!obj) {
-                    log('❌ Error: No se pudo obtener el objeto 3D del modelo');
-                    return;
-                }
-                
-                // Calcular bounding box de forma robusta
-                const box = new THREE.Box3();
-                
-                try {
-                    if (obj.children.length > 0) {
-                        box.setFromObject(obj);
-                    } else if (obj.geometry) {
-                        // Calcular bounding box directamente desde la geometría
-                        if (!obj.geometry.boundingBox) {
-                            obj.geometry.computeBoundingBox();
-                        }
-                        box.copy(obj.geometry.boundingBox);
-                        // Aplicar transformación
-                        box.applyMatrix4(obj.matrixWorld);
-                    } else {
-                        throw new Error('No se puede calcular el bounding box');
-                    }
-                    
-                    if (box.isEmpty()) {
-                        throw new Error('Bounding box vacío');
-                    }
-                    
-                    const center = box.getCenter(new THREE.Vector3());
-                    const size = box.getSize(new THREE.Vector3());
-                    
-                    // Validar valores
-                    if (isNaN(size.x) || isNaN(size.y) || isNaN(size.z)) {
-                        throw new Error('Dimensiones no válidas (NaN)');
-                    }
-                    
-                    const maxDimension = Math.max(size.x, size.y, size.z);
-                    
-                    // Centrar modelo
-                    obj.position.x = -center.x;
-                    obj.position.y = -center.y;
-                    obj.position.z = -center.z;
-                    
-                    // Escalar para que quepa bien en pantalla
-                    const scale = this.data.targetSize / maxDimension;
-                    obj.scale.set(scale, scale, scale);
-                    
-                    // Configurar propiedades de rendering
-                    obj.traverse(node => {
-                        if (node.isMesh) {
-                            node.frustumCulled = false;
-                            if (node.material) {
-                                node.material.needsUpdate = true;
-                            }
-                        }
-                    });
-                    
-                    log(`✅ Modelo ajustado: ${size.x.toFixed(2)}×${size.y.toFixed(2)}×${size.z.toFixed(2)} (escala: ${scale.toFixed(2)})`);
-                } catch (error) {
-                    log('⚠️ Usando escala y posición por defecto');
-                    
-                    // Valores por defecto como fallback
-                    obj.position.set(0, 0, 0);
-                    obj.scale.set(0.5, 0.5, 0.5);
-                }
-            }
+  <script>
+    const logEl = document.getElementById('log');
+    const log = m => { console.log(m); logEl.textContent = m + '\n' + logEl.textContent; };
+
+    const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+    const isSecure = location.protocol.startsWith('https') || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+    if(!isSecure) log('⚠️ Requiere HTTPS para la cámara (o localhost)');
+    if(isMobile) log('📱 Dispositivo móvil detectado');
+
+    /* ========= smart-model (mejorado) ========= */
+    AFRAME.registerComponent('smart-model', {
+      schema: { targetSize: {type:'number', default:1.0} },
+      init(){
+        this.modelLoaded=false; this.adjustAttempts=0; this.maxAttempts=10;
+        this.el.addEventListener('model-loaded', ()=>{
+          log('Modelo cargado, iniciando ajuste...');
+          this.modelLoaded=true; this.tryToAdjustModel();
         });
-        
-        // Función para añadir botón de regreso
-        function addBackButton(onBack) {
-            const btn = document.createElement('button');
-            btn.className = 'back-btn';
-            btn.innerHTML = '← Volver';
-            btn.onclick = () => {
-                onBack();
-                btn.remove();
-                document.getElementById('screen').style.display = 'grid';
-            };
-            document.body.appendChild(btn);
-            return btn;
+        this.el.addEventListener('model-error', e=>{
+          log(`❌ Error cargando modelo: ${e.detail ? e.detail.src : 'Origen desconocido'}`);
+        });
+      },
+      tryToAdjustModel(){
+        if(!this.modelLoaded || this.adjustAttempts>=this.maxAttempts) return;
+        this.adjustAttempts++;
+        const obj = this.el.getObject3D('mesh');
+        if(!obj){ setTimeout(()=>this.tryToAdjustModel(),200); return; }
+        obj.updateMatrixWorld(true);
+        if (obj.children.length===0 && !obj.geometry){ setTimeout(()=>this.tryToAdjustModel(),200); return; }
+        this.adjustModel();
+      },
+      adjustModel(){
+        const obj = this.el.getObject3D('mesh');
+        if(!obj){ log('❌ No se obtuvo el mesh del modelo'); return; }
+        const box = new THREE.Box3();
+        try{
+          if(obj.children.length>0){
+            box.setFromObject(obj);
+          }else if(obj.geometry){
+            if(!obj.geometry.boundingBox) obj.geometry.computeBoundingBox();
+            box.copy(obj.geometry.boundingBox);
+            box.applyMatrix4(obj.matrixWorld);
+          }else{
+            throw new Error('No se puede calcular el bounding box');
+          }
+          if(box.isEmpty()) throw new Error('Bounding box vacío');
+
+          const center = box.getCenter(new THREE.Vector3());
+          const size = box.getSize(new THREE.Vector3());
+          if([size.x,size.y,size.z].some(n=>isNaN(n))){ throw new Error('Dimensiones no válidas (NaN)'); }
+          const maxDimension = Math.max(size.x,size.y,size.z);
+
+          obj.position.set(-center.x, -center.y, -center.z);
+          const scale = this.data.targetSize / maxDimension;
+          obj.scale.setScalar(scale);
+          obj.traverse(n=>{ if(n.isMesh){ n.frustumCulled=false; if(n.material) n.material.needsUpdate=true; } });
+
+          log(`✅ Modelo ajustado: ${size.x.toFixed(2)}×${size.y.toFixed(2)}×${size.z.toFixed(2)} (escala: ${scale.toFixed(2)})`);
+        }catch(err){
+          log('⚠️ Fallback de ajuste aplicado');
+          obj.position.set(0,0,0);
+          obj.scale.set(0.5,0.5,0.5);
         }
-        
-        // --- DEMO 3D CORREGIDA ---
-        function startDemo(){
-            document.getElementById('screen').style.display = 'none';
-            log('Iniciando Demo 3D...');
-            
-            const wrap = document.getElementById('demoWrap');
-            wrap.style.display='block';
-            wrap.innerHTML = `
-                <a-scene id="demoScene" background="color: #EFEFEF" 
-                    renderer="colorManagement: true; physicallyCorrectLights: true;">
-                    <a-assets timeout="30000">
-                        <a-asset-item id="model-asset" src="./covid.glb"></a-asset-item>
-                    </a-assets>
-                    
-                    <a-entity light="type: ambient; intensity: 0.7"></a-entity>
-                    <a-entity light="type: directional; intensity: 1.0" position="2 2 1"></a-entity>
-                    
-                    <a-camera id="demoCamera" position="0 1.6 0" look-controls="enabled: false">
-                        <a-cursor></a-cursor>
-                    </a-camera>
-                    
-                    <a-entity id="modelContainer" position="0 0 -3">
-                        <a-entity id="rotationContainer">
-                            <a-gltf-model src="#model-asset" smart-model="targetSize: 1.5"></a-gltf-model>
-                        </a-entity>
-                    </a-entity>
-                </a-scene>
-            `;
-            
-            const scene = document.getElementById('demoScene');
-            scene.addEventListener('loaded', () => {
-                const rotationContainer = document.getElementById('rotationContainer');
-                const modelContainer = document.getElementById('modelContainer');
-                const camera = document.getElementById('demoCamera');
-                const canvas = scene.canvas;
-                
-                // Estado para controlar la rotación
-                const state = {
-                    isDragging: false,
-                    lastX: 0,
-                    lastY: 0,
-                    rotationX: 0,
-                    rotationY: 0,
-                    distance: 3,
-                    minDistance: 1,
-                    maxDistance: 8,
-                    sensitivity: 0.5
-                };
-                
-                function onPointerDown(e) {
-                    state.isDragging = true;
-                    state.lastX = e.clientX || e.touches[0].clientX;
-                    state.lastY = e.clientY || e.touches[0].clientY;
-                    canvas.style.cursor = 'grabbing';
-                }
-                
-                function onPointerUp() {
-                    state.isDragging = false;
-                    canvas.style.cursor = 'grab';
-                }
-                
-                function onPointerMove(e) {
-                    if (!state.isDragging) return;
-                    
-                    const x = e.clientX || e.touches[0].clientX;
-                    const y = e.clientY || e.touches[0].clientY;
-                    
-                    const deltaX = x - state.lastX;
-                    const deltaY = y - state.lastY;
-                    
-                    state.rotationY += deltaX * state.sensitivity;
-                    state.rotationX += deltaY * state.sensitivity;
-                    
-                    // Limitar rotación vertical
-                    state.rotationX = Math.max(-90, Math.min(90, state.rotationX));
-                    
-                    rotationContainer.setAttribute('rotation', {
-                        x: state.rotationX,
-                        y: state.rotationY,
-                        z: 0
-                    });
-                    
-                    state.lastX = x;
-                    state.lastY = y;
-                }
-                
-                function handleZoom(delta) {
-                    state.distance += delta;
-                    state.distance = Math.max(state.minDistance, Math.min(state.maxDistance, state.distance));
-                    modelContainer.setAttribute('position', `0 0 ${-state.distance}`);
-                }
-                
-                // Eventos de ratón
-                canvas.addEventListener('mousedown', onPointerDown);
-                document.addEventListener('mouseup', onPointerUp);
-                document.addEventListener('mousemove', onPointerMove);
-                canvas.addEventListener('wheel', (e) => {
-                    e.preventDefault();
-                    handleZoom(e.deltaY * 0.01);
-                });
-                
-                // Eventos táctiles
-                canvas.addEventListener('touchstart', (e) => {
-                    if (e.touches.length === 1) {
-                        onPointerDown(e);
-                    } else if (e.touches.length === 2) {
-                        e.preventDefault();
-                        // Guardar distancia inicial para zoom con pinch
-                        const dx = e.touches[0].clientX - e.touches[1].clientX;
-                        const dy = e.touches[0].clientY - e.touches[1].clientY;
-                        state.startTouchDistance = Math.sqrt(dx * dx + dy * dy);
-                    }
-                }, { passive: false });
-                
-                canvas.addEventListener('touchend', onPointerUp, { passive: false });
-                
-                canvas.addEventListener('touchmove', (e) => {
-                    if (e.touches.length === 1 && state.isDragging) {
-                        onPointerMove(e);
-                    } else if (e.touches.length === 2) {
-                        e.preventDefault();
-                        // Calcular distancia actual para zoom con pinch
-                        const dx = e.touches[0].clientX - e.touches[1].clientX;
-                        const dy = e.touches[0].clientY - e.touches[1].clientY;
-                        const distance = Math.sqrt(dx * dx + dy * dy);
-                        
-                        if (state.startTouchDistance) {
-                            const delta = (state.startTouchDistance - distance) * 0.02;
-                            handleZoom(delta);
-                            state.startTouchDistance = distance;
-                        }
-                    }
-                }, { passive: false });
-                
-                canvas.addEventListener('touchend', () => {
-                    state.startTouchDistance = null;
-                });
-                
-                canvas.style.cursor = 'grab';
-                log('✅ Demo 3D listo.');
-            });
-            
-            addBackButton(() => {
-                wrap.style.display = 'none';
-                wrap.innerHTML = '';
-            });
+      }
+    });
+
+    function addBackButton(onBack){
+      const btn = document.createElement('button');
+      btn.className='back-btn';
+      btn.innerHTML='← Volver';
+      btn.onclick=()=>{ onBack(); btn.remove(); document.getElementById('screen').style.display='grid'; };
+      document.body.appendChild(btn);
+      return btn;
+    }
+
+    /* ========== DEMO 3D (versión estable Gemini) ========== */
+    function startDemo(){
+      document.getElementById('screen').style.display='none';
+      log('Iniciando Demo 3D...');
+
+      const wrap = document.getElementById('demoWrap');
+      wrap.style.display='block';
+      wrap.innerHTML = `
+        <a-scene id="demoScene" background="color: #EFEFEF"
+                 renderer="colorManagement: true; physicallyCorrectLights: true;">
+          <a-assets timeout="30000">
+            <a-asset-item id="model-asset" src="./covid.glb"></a-asset-item>
+          </a-assets>
+
+          <a-entity light="type: ambient; intensity: 0.7"></a-entity>
+          <a-entity light="type: directional; intensity: 1.0" position="2 2 1"></a-entity>
+
+          <a-camera id="demoCamera" position="0 0 3" look-controls="enabled: false"></a-camera>
+
+          <!-- Contenedor a distancia (zoom mueve Z de la cámara) -->
+          <a-entity id="pivot">
+            <a-gltf-model src="#model-asset"></a-gltf-model>
+          </a-entity>
+        </a-scene>
+      `;
+
+      const backBtn = addBackButton(()=>{
+        wrap.style.display='none';
+        wrap.innerHTML='';
+      });
+
+      const scene = document.getElementById('demoScene');
+      scene.addEventListener('loaded', ()=>{
+        const pivot = document.getElementById('pivot');
+        const camera = scene.camera.el;
+        const canvas = scene.renderer.domElement;
+
+        const state = { isDragging:false, lastX:0, lastY:0, lastTouchDist:0 };
+        const sensitivity = 0.5;
+        const minZoom = 1.5, maxZoom = 8.0;
+
+        const onPointerDown = e =>{
+          state.isDragging = true;
+          const pos = e.touches ? e.touches[0] : e;
+          state.lastX = pos.clientX; state.lastY = pos.clientY;
+          canvas.style.cursor='grabbing';
+        };
+        const onPointerUp = () => { state.isDragging=false; canvas.style.cursor='grab'; };
+        const onPointerMove = e =>{
+          if(!state.isDragging) return;
+          const pos = e.touches ? e.touches[0] : e;
+          const dx = pos.clientX - state.lastX;
+          const dy = pos.clientY - state.lastY;
+          const r = pivot.getAttribute('rotation');
+          pivot.setAttribute('rotation', { x: r.x - dy*sensitivity, y: r.y + dx*sensitivity, z: 0 });
+          state.lastX = pos.clientX; state.lastY = pos.clientY;
+        };
+        const handleZoom = dz =>{
+          let newZ = camera.object3D.position.z + dz;
+          camera.object3D.position.z = Math.max(minZoom, Math.min(maxZoom, newZ));
+        };
+
+        // Mouse
+        canvas.addEventListener('mousedown', onPointerDown);
+        document.addEventListener('mouseup', onPointerUp);
+        document.addEventListener('mousemove', onPointerMove);
+        canvas.addEventListener('wheel', e=>{ e.preventDefault(); handleZoom(e.deltaY*0.01); }, {passive:false});
+
+        // Táctil
+        canvas.addEventListener('touchstart', e=>{
+          if(e.touches.length===1){ onPointerDown(e); }
+          if(e.touches.length===2){
+            const dx = e.touches[0].pageX - e.touches[1].pageX;
+            const dy = e.touches[0].pageY - e.touches[1].pageY;
+            state.lastTouchDist = Math.hypot(dx,dy);
+          }
+        }, {passive:false});
+        canvas.addEventListener('touchend', onPointerUp, {passive:false});
+        canvas.addEventListener('touchmove', e=>{
+          if(e.touches.length===1){ onPointerMove(e); }
+          if(e.touches.length===2){
+            e.preventDefault();
+            const dx = e.touches[0].pageX - e.touches[1].pageX;
+            const dy = e.touches[0].pageY - e.touches[1].pageY;
+            const d = Math.hypot(dx,dy);
+            if(state.lastTouchDist){
+              handleZoom((state.lastTouchDist - d) * 0.02);
+            }
+            state.lastTouchDist = d;
+          }
+        }, {passive:false});
+
+        canvas.style.cursor='grab';
+        document.getElementById('model-asset').addEventListener('loaded', ()=>log('✅ Demo 3D listo.'));
+        document.getElementById('model-asset').addEventListener('error',  ()=>log('❌ Error GLB (Demo)'));
+      });
+    }
+
+    /* ========== AR (tu parte que funciona) ========== */
+    function startAR(){
+      document.getElementById('screen').style.display = 'none';
+      log('Iniciando AR...');
+
+      // Overlay de instrucciones (tu implementación)
+      const overlay = document.createElement('div');
+      overlay.className = 'ar-overlay';
+      overlay.innerHTML = `
+        <div class="ar-instructions">
+          <h2>Modo AR Activado</h2>
+          <p>Permite el acceso a la cámara cuando se solicite</p>
+          <p>Apunta hacia tu marcador impreso</p>
+        </div>
+        <div class="loading-spinner"></div>
+      `;
+      document.body.appendChild(overlay);
+
+      // Escena AR (tu implementación)
+      const sceneEl = document.createElement('a-scene');
+      sceneEl.setAttribute('mindar-image', 'imageTargetSrc: ./targets.mind; autoStart: true; uiScanning: no; uiLoading: no; uiError: no;');
+      sceneEl.setAttribute('renderer', 'colorManagement: true; alpha: true;');
+      sceneEl.setAttribute('vr-mode-ui', 'enabled: false');
+      sceneEl.setAttribute('device-orientation-permission-ui', 'enabled: false');
+      sceneEl.setAttribute('embedded', '');
+
+      sceneEl.innerHTML = `
+        <a-assets timeout="60000">
+          <a-asset-item id="ar-model-asset" src="./covid.glb"></a-asset-item>
+        </a-assets>
+
+        <a-camera position="0 0 0" active="true" look-controls="enabled: false"></a-camera>
+
+        <a-entity light="type: ambient; color: #FFF; intensity: 0.6"></a-entity>
+        <a-entity light="type: directional; color: #FFF; intensity: 0.8" position="1 1 0"></a-entity>
+
+        <a-entity id="anchor" mindar-image-target="targetIndex: 0">
+          <a-gltf-model id="ar-model" src="#ar-model-asset" smart-model="targetSize: 0.8"
+                        position="0 0 0" rotation="0 0 0" scale="1 1 1" visible="false">
+          </a-gltf-model>
+        </a-entity>
+      `;
+      document.body.appendChild(sceneEl);
+
+      sceneEl.addEventListener('loaded', function(){
+        log('✅ Escena AR cargada correctamente.');
+        const anchor = document.getElementById('anchor');
+        const model  = document.getElementById('ar-model');
+
+        if(anchor){
+          anchor.addEventListener('targetFound', ()=>{
+            log('🎯 ¡Marcador encontrado!');
+            if(model){
+              model.setAttribute('visible','true');
+              model.setAttribute('animation', {
+                property: 'scale',
+                from: '0.5 0.5 0.5',
+                to: '1 1 1',
+                dur: 500,
+                easing: 'easeOutElastic'
+              });
+            }
+          });
+          anchor.addEventListener('targetLost', ()=>{
+            log('Marcador perdido.');
+            if(model) model.setAttribute('visible','false');
+          });
         }
-        
-        // --- AR CORREGIDO ---
-        function startAR(){
-            document.getElementById('screen').style.display = 'none';
-            log('Iniciando AR...');
-            
-            // Crear overlay de instrucciones
-            const overlay = document.createElement('div');
-            overlay.className = 'ar-overlay';
-            overlay.innerHTML = `
-                <div class="ar-instructions">
-                    <h2>Modo AR Activado</h2>
-                    <p>Permite el acceso a la cámara cuando se solicite</p>
-                    <p>Apunta hacia tu marcador impreso</p>
-                </div>
-                <div class="loading-spinner"></div>
-            `;
-            document.body.appendChild(overlay);
-            
-            // Crear la escena AR
-            const sceneEl = document.createElement('a-scene');
-            sceneEl.setAttribute('mindar-image', 'imageTargetSrc: ./targets.mind; autoStart: true; uiScanning: no; uiLoading: no; uiError: no;');
-            sceneEl.setAttribute('renderer', 'colorManagement: true; alpha: true;');
-            sceneEl.setAttribute('vr-mode-ui', 'enabled: false');
-            sceneEl.setAttribute('device-orientation-permission-ui', 'enabled: false');
-            sceneEl.setAttribute('embedded', '');
-            
-            sceneEl.innerHTML = `
-                <a-assets timeout="60000">
-                    <a-asset-item id="ar-model-asset" src="./covid.glb"></a-asset-item>
-                </a-assets>
-                
-                <a-camera position="0 0 0" active="true" look-controls="enabled: false"></a-camera>
-                
-                <a-entity light="type: ambient; color: #FFF; intensity: 0.6"></a-entity>
-                <a-entity light="type: directional; color: #FFF; intensity: 0.8" position="1 1 0"></a-entity>
-                
-                <a-entity id="anchor" mindar-image-target="targetIndex: 0">
-                    <a-gltf-model id="ar-model" src="#ar-model-asset" smart-model="targetSize: 0.8" 
-                                position="0 0 0" rotation="0 0 0" scale="1 1 1" visible="false">
-                    </a-gltf-model>
-                </a-entity>
-            `;
-            
-            document.body.appendChild(sceneEl);
-            
-            // Eventos de la escena AR
-            sceneEl.addEventListener('loaded', function() {
-                log('✅ Escena AR cargada correctamente.');
-                
-                // Obtener el modelo y el anchor
-                const anchor = document.getElementById('anchor');
-                const model = document.getElementById('ar-model');
-                
-                if (anchor) {
-                    anchor.addEventListener('targetFound', event => {
-                        log('🎯 ¡Marcador encontrado!');
-                        if (model) {
-                            model.setAttribute('visible', 'true');
-                            // Pequeña animación de confirmación
-                            model.setAttribute('animation', {
-                                property: 'scale',
-                                from: '0.5 0.5 0.5',
-                                to: '1 1 1',
-                                dur: 500,
-                                easing: 'easeOutElastic'
-                            });
-                        }
-                    });
-                    
-                    anchor.addEventListener('targetLost', event => {
-                        log('Marcador perdido.');
-                        if (model) {
-                            model.setAttribute('visible', 'false');
-                        }
-                    });
-                }
-                
-                setTimeout(() => {
-                    overlay.style.display = 'none';
-                }, 2000);
-            });
-            
-            sceneEl.addEventListener('renderstart', function() {
-                log('✅ Renderizado AR iniciado. Cámara activa.');
-            });
-            
-            // Manejar posibles errores
-            sceneEl.addEventListener('error', (e) => {
-                log('❌ Error en la escena AR: ' + (e.detail ? e.detail.message : 'Error desconocido'));
-                overlay.innerHTML = '<div class="ar-instructions"><h2>Error al cargar AR</h2><p>Verifica la consola para más detalles</p></div>';
-            });
-            
-            // Botón para volver
-            const backBtn = addBackButton(() => {
-                try {
-                    const mindarSystem = sceneEl.systems['mindar-image-system'];
-                    if (mindarSystem) {
-                        mindarSystem.stop();
-                        log('Sistema AR detenido.');
-                    }
-                } catch (e) {
-                    console.error('Error al detener MindAR:', e);
-                }
-                
-                sceneEl.parentNode.removeChild(sceneEl);
-                if (overlay.parentNode) {
-                    overlay.parentNode.removeChild(overlay);
-                }
-            });
-        }
-        
-        // Asignar eventos a los botones
-        document.getElementById('btnDemo').addEventListener('click', startDemo);
-        document.getElementById('btnAR').addEventListener('click', startAR);
-    </script>
+        setTimeout(()=>{ overlay.style.display='none'; }, 2000);
+      });
+
+      sceneEl.addEventListener('renderstart', ()=> log('✅ Renderizado AR iniciado. Cámara activa.'));
+      sceneEl.addEventListener('error', e=>{
+        log('❌ Error en la escena AR: ' + (e.detail ? e.detail.message : 'Error desconocido'));
+        overlay.innerHTML = '<div class="ar-instructions"><h2>Error al cargar AR</h2><p>Verifica la consola para más detalles</p></div>';
+      });
+
+      // Botón volver (tu flujo)
+      const backBtn = addBackButton(()=>{
+        try{
+          const mindarSystem = sceneEl.systems['mindar-image-system'];
+          if(mindarSystem){ mindarSystem.stop(); log('Sistema AR detenido.'); }
+        }catch(e){ console.error('Error al detener MindAR:', e); }
+        sceneEl.remove();
+        if(overlay.parentNode) overlay.parentNode.removeChild(overlay);
+      });
+    }
+
+    // Eventos
+    document.getElementById('btnDemo').addEventListener('click', startDemo);
+    document.getElementById('btnAR').addEventListener('click', startAR);
+  </script>
 </body>
 </html>
