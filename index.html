@@ -3,9 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-  <title>AR (MindAR) + Demo 3D — Fixed Final</title>
+  <title>AR (MindAR) + Demo 3D — Corregido</title>
 
-  <!-- Librerías locales en la RAÍZ -->
   <script src="./aframe.min.js"></script>
   <script src="./mindar-image-aframe.prod.js"></script>
 
@@ -30,7 +29,7 @@
       <button class="btn" id="btnAR">📱 AR con Marcador</button>
       <button class="btn" id="btnDemo">🎯 Demo 3D</button>
     </div>
-    <div class="hint">AR: Apunta a tu marcador impreso | Demo: Arrastra para rotar, pinch para zoom</div>
+    <div class="hint">AR: Apunta a tu marcador impreso | Demo: Arrastra para rotar, pellizca para zoom</div>
   </div>
 
   <div id="demoWrap"></div>
@@ -43,15 +42,6 @@
       console.log(m); 
       logEl.textContent += (logEl.textContent?'\n':'') + m; 
       logEl.scrollTop = logEl.scrollHeight;
-      // Auto-hide log en mobile después de 3 segundos
-      if(/Mobi|Android/i.test(navigator.userAgent)) {
-        setTimeout(() => {
-          if(logEl.style.opacity !== '0') {
-            logEl.style.transition = 'opacity 0.5s';
-            logEl.style.opacity = '0.3';
-          }
-        }, 3000);
-      }
     };
     
     const isMobile = /Mobi|Android/i.test(navigator.userAgent);
@@ -61,51 +51,36 @@
     if(!window.AFRAME) log('❌ A-Frame NO cargó');
     if(isMobile) log('📱 Dispositivo móvil detectado');
 
-    // Componente mejorado para centrar modelo correctamente
-    AFRAME.registerComponent('center-and-scale', {
+    // Componente para centrar y escalar modelo apropiadamente
+    AFRAME.registerComponent('smart-model', {
+      schema: {
+        targetSize: {type: 'number', default: 1.0}
+      },
       init(){
         this.el.addEventListener('model-loaded', () => {
           const obj = this.el.getObject3D('mesh');
-          if(!obj) {
-            log('⚠️ No se pudo cargar el modelo 3D');
-            return;
-          }
+          if(!obj) { log('⚠️ No se pudo cargar el modelo 3D'); return; }
           
-          // Calcular bounding box
           const box = new THREE.Box3().setFromObject(obj);
           const center = box.getCenter(new THREE.Vector3());
           const size = box.getSize(new THREE.Vector3());
           const maxDimension = Math.max(size.x, size.y, size.z);
           
-          // IMPORTANTE: Centrar el modelo en el origen local
-          obj.position.copy(center.negate());
+          obj.position.sub(center);
           
-          // Escalar apropiadamente
-          const targetSize = this.data.targetSize || 1.0;
-          const scale = targetSize / maxDimension;
+          const scale = this.data.targetSize / maxDimension;
           obj.scale.setScalar(scale);
           
-          // Configurar propiedades de rendering
           obj.traverse(node => {
             if(node.isMesh){
               node.frustumCulled = false;
               node.castShadow = true;
               node.receiveShadow = true;
-              if(node.material) {
-                node.material.needsUpdate = true;
-              }
             }
           });
           
-          obj.updateMatrixWorld(true);
-          log(`✅ Modelo centrado: ${size.x.toFixed(1)}×${size.y.toFixed(1)}×${size.z.toFixed(1)} escala: ${scale.toFixed(2)}`);
-          
-          // Marcar como listo
-          this.el.setAttribute('data-model-ready', 'true');
+          log(`✅ Modelo cargado y ajustado (escala: ${scale.toFixed(2)})`);
         });
-      },
-      schema: {
-        targetSize: {type: 'number', default: 1.0}
       }
     });
 
@@ -122,38 +97,30 @@
       return btn;
     }
 
-    // ===== DEMO 3D - ROTACIÓN FIJA EN EL CENTRO =====
+    // ===== DEMO 3D CORREGIDO Y MEJORADO =====
     function startDemo(){
       document.getElementById('screen').style.display='none';
       const wrap = document.getElementById('demoWrap');
       wrap.style.display='block';
 
+      // CAMBIO: Estructura HTML con un pivote para la rotación.
       wrap.innerHTML = `
         <a-scene id="demoScene" background="color: #f8f8f8"
-                 renderer="colorManagement:true; antialias:${isMobile ? 'false' : 'true'}; precision:${isMobile ? 'mediump' : 'highp'}" 
-                 vr-mode-ui="enabled:false" 
-                 device-orientation-permission-ui="enabled: false">
+                 renderer="colorManagement:true; antialias:${isMobile ? 'false' : 'true'};" 
+                 vr-mode-ui="enabled:false">
           <a-assets timeout="30000">
             <a-asset-item id="covidModel" src="./covid.glb"></a-asset-item>
           </a-assets>
 
-          <a-entity light="type: ambient; intensity: 0.7"></a-entity>
+          <a-entity light="type: ambient; intensity: 0.8"></a-entity>
           <a-entity light="type: directional; intensity: 1.0" position="2 3 2"></a-entity>
-          <a-entity light="type: directional; intensity: 0.4" position="-1 -1 -1"></a-entity>
 
-          <!-- Cámara fija en origen -->
-          <a-camera id="demoCamera" position="0 0 0" 
-                    look-controls="enabled:false" 
-                    wasd-controls="enabled:false">
-          </a-camera>
+          <a-camera id="demoCamera" position="0 0 0" look-controls="enabled:false" wasd-controls="enabled:false"></a-camera>
 
-          <!-- Estructura: pivot (distancia) -> rotator (rotación) -> model (centrado en 0,0,0) -->
-          <a-entity id="pivot" position="0 0 -3.5">
-            <a-entity id="rotator" rotation="-15 0 0">
+          <a-entity id="modelContainer" position="0 0 -2.5">
+            <a-entity id="modelPivot">
               <a-gltf-model id="model3d" src="#covidModel" 
-                            center-and-scale="targetSize: 1.5"
-                            position="0 0 0">
-              </a-gltf-model>
+                            smart-model="targetSize: 1.2"></a-gltf-model>
             </a-entity>
           </a-entity>
         </a-scene>
@@ -164,370 +131,197 @@
         document.getElementById('screen').style.display = 'grid';
         backBtn.remove();
         if(debugInfo) debugInfo.remove();
+        document.getElementById('demoScene').remove();
       });
 
-      // Info de debug para móvil
       let debugInfo = null;
       if(isMobile) {
         debugInfo = document.createElement('div');
         debugInfo.className = 'debug-info';
-        debugInfo.innerHTML = 'Cargando...';
         document.body.appendChild(debugInfo);
       }
 
       const scene = document.getElementById('demoScene');
       scene.addEventListener('loaded', () => {
-        const pivot = document.getElementById('pivot');
-        const rotator = document.getElementById('rotator');
+        // CAMBIO: Obtenemos referencias al contenedor y al nuevo pivote.
+        const container = document.getElementById('modelContainer');
+        const pivot = document.getElementById('modelPivot');
         const canvas = scene.renderer.domElement;
 
-        // Estado de control
         const state = {
-          isDragging: false,
-          lastX: 0,
-          lastY: 0,
-          rotationX: -15, // Vista inicial ligeramente desde arriba
-          rotationY: 0,
-          distance: 3.5,
-          minDistance: 1.8,
-          maxDistance: 8.0,
-          sensitivity: isMobile ? 0.7 : 0.5
-        };
-
-        function updateDebugInfo() {
-          if(debugInfo) {
-            debugInfo.innerHTML = `
-              X: ${state.rotationX.toFixed(0)}° Y: ${state.rotationY.toFixed(0)}°<br>
-              Dist: ${state.distance.toFixed(1)}
-            `;
-          }
-        }
-
-        function getPointerPos(e) {
-          if(e.touches && e.touches.length > 0) {
-            return { x: e.touches[0].clientX, y: e.touches[0].clientY };
-          }
-          return { x: e.clientX, y: e.clientY };
-        }
-
-        function onPointerDown(e) {
-          e.preventDefault();
-          const pos = getPointerPos(e);
-          state.isDragging = true;
-          state.lastX = pos.x;
-          state.lastY = pos.y;
-          canvas.style.cursor = 'grabbing';
-        }
-
-        function onPointerUp(e) {
-          e.preventDefault();
-          state.isDragging = false;
-          canvas.style.cursor = 'grab';
-        }
-
-        function onPointerMove(e) {
-          if (!state.isDragging) return;
-          e.preventDefault();
-
-          const pos = getPointerPos(e);
-          const deltaX = pos.x - state.lastX;
-          const deltaY = pos.y - state.lastY;
-
-          // Actualizar rotación - el modelo rota en su propio centro
-          state.rotationY += deltaX * state.sensitivity;
-          state.rotationX -= deltaY * state.sensitivity;
-          
-          // Limitar rotación vertical
-          state.rotationX = clamp(state.rotationX, -85, 85);
-
-          // Aplicar rotación al rotator (el modelo ya está centrado)
-          rotator.setAttribute('rotation', `${state.rotationX} ${state.rotationY} 0`);
-
-          state.lastX = pos.x;
-          state.lastY = pos.y;
-          updateDebugInfo();
-        }
-
-        // Eventos mouse
-        canvas.addEventListener('mousedown', onPointerDown);
-        canvas.addEventListener('mouseup', onPointerUp);
-        canvas.addEventListener('mouseleave', onPointerUp);
-        canvas.addEventListener('mousemove', onPointerMove);
-
-        // Eventos touch
-        canvas.addEventListener('touchstart', e => {
-          if (e.touches.length === 1) {
-            onPointerDown(e);
-          }
-        }, { passive: false });
-
-        canvas.addEventListener('touchend', onPointerUp, { passive: false });
-
-        canvas.addEventListener('touchmove', e => {
-          if (e.touches.length === 1) {
-            onPointerMove(e);
-          } else if (e.touches.length === 2) {
-            // Pinch zoom - mover pivot para acercarse/alejarse
-            e.preventDefault();
-            const touch1 = e.touches[0];
-            const touch2 = e.touches[1];
-            const currentDistance = Math.hypot(
-              touch2.clientX - touch1.clientX,
-              touch2.clientY - touch1.clientY
-            );
-
-            if (state.lastTouchDistance) {
-              const ratio = state.lastTouchDistance / currentDistance;
-              state.distance *= ratio;
-              state.distance = clamp(state.distance, state.minDistance, state.maxDistance);
-              pivot.setAttribute('position', `0 0 ${-state.distance}`);
-              updateDebugInfo();
-            }
-            state.lastTouchDistance = currentDistance;
-          }
-        }, { passive: false });
-
-        canvas.addEventListener('touchend', () => {
-          state.lastTouchDistance = null;
-        });
-
-        // Zoom con rueda
-        canvas.addEventListener('wheel', e => {
-          e.preventDefault();
-          const zoomSpeed = 0.2;
-          state.distance += Math.sign(e.deltaY) * zoomSpeed;
-          state.distance = clamp(state.distance, state.minDistance, state.maxDistance);
-          pivot.setAttribute('position', `0 0 ${-state.distance}`);
-          updateDebugInfo();
-        }, { passive: false });
-
-        canvas.style.cursor = 'grab';
-
-        // Eventos del modelo
-        document.getElementById('covidModel').addEventListener('loaded', () => {
-          log('✅ Modelo cargado y centrado en DEMO');
-          updateDebugInfo();
-        });
-
-        document.getElementById('covidModel').addEventListener('error', () => {
-          log('❌ Error cargando covid.glb');
-        });
-
-        log(`✅ Demo listo - Rotación fija en centro`);
-      });
-    }
-
-    // ===== AR CON MODELO GRANDE Y VISIBLE =====
-    function startAR(){
-      document.getElementById('screen').style.display='none';
-      
-      if(!isSecure){ 
-        log('❌ Requiere HTTPS para cámara');
-        setTimeout(() => {
-          document.getElementById('screen').style.display = 'grid';
-        }, 2000);
-        return;
-      }
-
-      const sceneHTML = `
-        <a-scene id="arScene"
-          mindar-image="imageTargetSrc: ./targets.mind; maxTrack: 1; showStats: false; uiLoading: no; uiError: no; uiScanning: no;"
-          renderer="colorManagement:true; physicallyCorrectLights:true; alpha:true; antialias:false; precision: mediump;"
-          vr-mode-ui="enabled:false"
-          device-orientation-permission-ui="enabled: false"
-          embedded>
-          
-          <a-assets timeout="30000">
-            <a-asset-item id="covidModelAR" src="./covid.glb"></a-asset-item>
-          </a-assets>
-
-          <a-entity light="type: ambient; intensity: 0.9"></a-entity>
-          <a-entity light="type: directional; intensity: 1.0" position="1 2 1"></a-entity>
-
-          <a-entity id="anchor" mindar-image-target="targetIndex: 0">
-            <!-- Contenedor AR escalado y elevado -->
-            <a-entity id="arContainer" position="0 0.02 0" scale="4.0 4.0 4.0" rotation="0 0 0">
-              <a-gltf-model id="arModel" src="#covidModelAR" 
-                            center-and-scale="targetSize: 0.7"
-                            position="0 0 0"
-                            visible="true">
-              </a-gltf-model>
-            </a-entity>
-          </a-entity>
-
-          <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-        </a-scene>
-      `;
-      
-      document.body.insertAdjacentHTML('beforeend', sceneHTML);
-
-      const backBtn = addBackButton(() => {
-        const scene = document.getElementById('arScene');
-        if (scene) scene.remove();
-        document.getElementById('screen').style.display = 'grid';
-        backBtn.remove();
-      });
-
-      const scene = document.getElementById('arScene');
-      
-      scene.addEventListener('loaded', () => {
-        log('✅ AR listo - busca tu marcador');
-      });
-
-      scene.addEventListener('renderstart', () => {
-        log('📹 Cámara AR activa');
-      });
-
-      // Eventos del marcador
-      setTimeout(() => {
-        const anchor = document.getElementById('anchor');
-        const arContainer = document.getElementById('arContainer');
-        
-        if (anchor) {
-          anchor.addEventListener('targetFound', () => {
-            log('🎯 ¡MARCADOR ENCONTRADO!');
-            if(arContainer) {
-              arContainer.setAttribute('visible', 'true');
-              // Animación de aparición
-              arContainer.setAttribute('animation__appear', {
-                property: 'scale',
-                from: '2.0 2.0 2.0',
-                to: '4.0 4.0 4.0',
-                dur: 800,
-                easing: 'easeOutElastic'
-              });
-            }
-          });
-          
-          anchor.addEventListener('targetLost', () => {
-            log('❌ Marcador perdido');
-          });
-        }
-
-        // Controles AR interactivos
-        const canvas = scene.renderer.domElement;
-        const arState = {
           isDragging: false,
           lastX: 0,
           lastY: 0,
           rotationX: 0,
           rotationY: 0,
-          scale: 4.0,
-          minScale: 2.0,
-          maxScale: 7.0
+          distance: 2.5,
+          minDistance: 1.2,
+          maxDistance: 6.0,
+          sensitivity: isMobile ? 0.6 : 0.4,
+          lastTouchDistance: null
         };
 
-        function isTracked() {
-          return anchor && anchor.components && 
-                 anchor.components['mindar-image-target'] && 
-                 anchor.components['mindar-image-target'].isTracked;
-        }
-
-        function onARPointerDown(e) {
-          if (!isTracked()) return;
-          e.preventDefault();
-          const pos = e.touches ? 
-            { x: e.touches[0].clientX, y: e.touches[0].clientY } : 
-            { x: e.clientX, y: e.clientY };
-          arState.isDragging = true;
-          arState.lastX = pos.x;
-          arState.lastY = pos.y;
-        }
-
-        function onARPointerMove(e) {
-          if (!arState.isDragging || !isTracked()) return;
-          e.preventDefault();
-
-          const pos = e.touches ? 
-            { x: e.touches[0].clientX, y: e.touches[0].clientY } : 
-            { x: e.clientX, y: e.clientY };
-          
-          const deltaX = pos.x - arState.lastX;
-          const deltaY = pos.y - arState.lastY;
-
-          arState.rotationY += deltaX * 0.8;
-          arState.rotationX -= deltaY * 0.6;
-          arState.rotationX = clamp(arState.rotationX, -60, 60);
-
-          if(arContainer) {
-            arContainer.setAttribute('rotation', `${arState.rotationX} ${arState.rotationY} 0`);
+        function updateDebugInfo() {
+          if(debugInfo) {
+            debugInfo.innerHTML = `Rot: ${state.rotationX.toFixed(0)}°, ${state.rotationY.toFixed(0)}°<br>Dist: ${state.distance.toFixed(1)}`;
           }
+        }
+        updateDebugInfo();
 
-          arState.lastX = pos.x;
-          arState.lastY = pos.y;
+        const getPointerPos = e => e.touches ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : { x: e.clientX, y: e.clientY };
+
+        function onPointerDown(e) {
+          state.isDragging = true;
+          const pos = getPointerPos(e);
+          state.lastX = pos.x;
+          state.lastY = pos.y;
+          canvas.style.cursor = 'grabbing';
         }
 
-        function onARPointerUp() {
-          arState.isDragging = false;
+        function onPointerUp() {
+          state.isDragging = false;
+          canvas.style.cursor = 'grab';
+          state.lastTouchDistance = null; // Reset pinch zoom state
         }
 
-        // Eventos AR
-        canvas.addEventListener('mousedown', onARPointerDown);
-        canvas.addEventListener('mouseup', onARPointerUp);
-        canvas.addEventListener('mousemove', onARPointerMove);
+        function onPointerMove(e) {
+          if (!state.isDragging) return;
+          const pos = getPointerPos(e);
+          const deltaX = pos.x - state.lastX;
+          const deltaY = pos.y - state.lastY;
+          state.rotationY += deltaX * state.sensitivity;
+          state.rotationX -= deltaY * state.sensitivity;
+          state.rotationX = clamp(state.rotationX, -80, 80);
+          
+          // CAMBIO: Aplicamos la rotación solo al PIVOTE.
+          pivot.setAttribute('rotation', `${state.rotationX} ${state.rotationY} 0`);
+
+          state.lastX = pos.x;
+          state.lastY = pos.y;
+          updateDebugInfo();
+        }
+        
+        function handlePinch(e) {
+          const touch1 = e.touches[0];
+          const touch2 = e.touches[1];
+          const currentDist = Math.hypot(touch2.clientX - touch1.clientX, touch2.clientY - touch1.clientY);
+
+          if (state.lastTouchDistance) {
+            const ratio = state.lastTouchDistance / currentDist;
+            state.distance *= ratio;
+            state.distance = clamp(state.distance, state.minDistance, state.maxDistance);
+            
+            // CAMBIO: Aplicamos el zoom (distancia) solo al CONTENEDOR.
+            container.setAttribute('position', `0 0 ${-state.distance}`);
+            updateDebugInfo();
+          }
+          state.lastTouchDistance = currentDist;
+        }
+
+        function handleWheel(e) {
+          state.distance += Math.sign(e.deltaY) * 0.15;
+          state.distance = clamp(state.distance, state.minDistance, state.maxDistance);
+          container.setAttribute('position', `0 0 ${-state.distance}`);
+          updateDebugInfo();
+        }
+        
+        // --- Event Listeners Unificados ---
+        canvas.addEventListener('mousedown', onPointerDown);
+        canvas.addEventListener('mouseup', onPointerUp);
+        canvas.addEventListener('mouseleave', onPointerUp);
+        canvas.addEventListener('mousemove', onPointerMove);
+        canvas.addEventListener('wheel', handleWheel, { passive: true });
+
         canvas.addEventListener('touchstart', e => {
-          if (e.touches.length === 1) {
-            onARPointerDown(e);
-          }
+          if (e.touches.length === 1) onPointerDown(e);
+          e.preventDefault();
         }, { passive: false });
-        canvas.addEventListener('touchend', onARPointerUp, { passive: false });
+        
+        canvas.addEventListener('touchend', onPointerUp);
+        
         canvas.addEventListener('touchmove', e => {
-          if (e.touches.length === 1) {
-            onARPointerMove(e);
-          } else if (e.touches.length === 2 && isTracked()) {
-            // Pinch zoom para AR
-            e.preventDefault();
-            const touch1 = e.touches[0];
-            const touch2 = e.touches[1];
-            const currentDistance = Math.hypot(
-              touch2.clientX - touch1.clientX,
-              touch2.clientY - touch1.clientY
-            );
-
-            if (arState.lastTouchDistance) {
-              const ratio = currentDistance / arState.lastTouchDistance;
-              arState.scale *= ratio;
-              arState.scale = clamp(arState.scale, arState.minScale, arState.maxScale);
-              
-              if(arContainer) {
-                arContainer.setAttribute('scale', `${arState.scale} ${arState.scale} ${arState.scale}`);
-              }
-            }
-            arState.lastTouchDistance = currentDistance;
-          }
+          if (e.touches.length === 1 && state.isDragging) onPointerMove(e);
+          else if (e.touches.length === 2) handlePinch(e);
+          e.preventDefault();
         }, { passive: false });
 
-        canvas.addEventListener('touchend', () => {
-          arState.lastTouchDistance = null;
-        });
+        canvas.style.cursor = 'grab';
+        log(`✅ Demo listo (${isMobile ? 'móvil' : 'desktop'})`);
+      });
+    }
 
-        log('✅ Controles AR configurados');
-      }, 1500);
+    // ===== AR CORREGIDO Y MEJORADO =====
+    function startAR(){
+      document.getElementById('screen').style.display='none';
+      
+      if(!isSecure){ 
+        log('❌ AR requiere HTTPS para la cámara');
+        addBackButton(() => { document.getElementById('screen').style.display = 'grid'; });
+        return;
+      }
 
-      // Verificar carga del modelo AR
-      setTimeout(() => {
-        const modelAsset = document.getElementById('covidModelAR');
-        if(modelAsset) {
-          modelAsset.addEventListener('loaded', () => {
-            log('✅ Modelo AR cargado y escalado');
-          });
+      const sceneHTML = `
+        <a-scene id="arScene"
+          mindar-image="imageTargetSrc: ./targets.mind; maxTrack: 1;"
+          renderer="colorManagement:true; physicallyCorrectLights:true; alpha:true;"
+          vr-mode-ui="enabled:false" device-orientation-permission-ui="enabled: false" embedded>
           
-          modelAsset.addEventListener('error', (e) => {
-            log('❌ Error modelo AR: verifica covid.glb');
-          });
-        }
-      }, 500);
+          <a-assets timeout="30000">
+            <a-asset-item id="covidModelAR" src="./covid.glb"></a-asset-item>
+          </a-assets>
 
-      log('🔄 Iniciando AR...');
+          <a-entity light="type: ambient; intensity: 0.8"></a-entity>
+          <a-entity light="type: directional; intensity: 1.2" position="0 1 1"></a-entity>
+          <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
+          <a-entity id="anchor" mindar-image-target="targetIndex: 0">
+            <a-gltf-model id="arModel" src="#covidModelAR" 
+                          smart-model="targetSize: 0.8"
+                          position="0 0 0"
+                          rotation="-90 0 0"
+                          visible="false">
+            </a-gltf-model>
+          </a-entity>
+        </a-scene>
+      `;
+      document.body.insertAdjacentHTML('beforeend', sceneHTML);
+
+      const backBtn = addBackButton(() => {
+        const scene = document.getElementById('arScene');
+        if (scene) {
+          scene.systems['mindar-image-system'].stop(); // Detener cámara
+          scene.remove();
+        }
+        document.getElementById('screen').style.display = 'grid';
+        backBtn.remove();
+      });
+
+      const scene = document.getElementById('arScene');
+      scene.addEventListener('loaded', () => {
+        const anchor = document.getElementById('anchor');
+        const model = document.getElementById('arModel');
+        
+        anchor.addEventListener('targetFound', () => {
+          log('🎯 ¡MARCADOR ENCONTRADO!');
+          model.setAttribute('visible', 'true');
+          model.setAttribute('animation', 'property: scale; to: 1.1 1.1 1.1; dur: 400; dir: alternate; loop: 2; easing: easeInOutQuad');
+        });
+        
+        // CAMBIO: Se añade el evento para ocultar el modelo al perder el marcador.
+        anchor.addEventListener('targetLost', () => {
+          log('❌ Marcador perdido');
+          model.setAttribute('visible', 'false');
+        });
+        
+        log('✅ AR listo - busca tu marcador');
+      });
     }
 
     // Event listeners
     document.getElementById('btnDemo').addEventListener('click', startDemo);
     document.getElementById('btnAR').addEventListener('click', startAR);
 
-    setTimeout(() => {
-      log('📁 Archivos necesarios: covid.glb, targets.mind + librerías JS');
-    }, 1000);
+    log('📁 Archivos necesarios: aframe.min.js, mindar-image-aframe.prod.js, covid.glb, targets.mind');
   </script>
 </body>
 </html>
