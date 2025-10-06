@@ -3,119 +3,475 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>Visor 360° para Cardboard (Foto Equirectangular)</title>
-  <!-- A-Frame (maneja VR/WebXR y split para Cardboard) -->
+  <title>Visor 360° VR Cardboard</title>
   <script src="https://unpkg.com/aframe@1.5.0/dist/aframe.min.js"></script>
   <style>
-    html, body { margin:0; height:100%; background:#000; color:#fff; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif; }
-    #ui { position: fixed; inset: auto 0 0 0; background: linear-gradient(transparent, rgba(0,0,0,.75)); padding: 10px 12px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; z-index: 10; }
-    .row { display:flex; align-items:center; gap:6px; }
-    input[type="range"] { width: 140px; }
-    #msg { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.55); padding: 6px 10px; border-radius: 10px; font-size: 12px; z-index: 10; }
-    #enterVRBtn, #fsBtn, #resetBtn { background:#0a84ff; border:none; color:#fff; padding:10px 12px; border-radius:10px; font-weight:600; }
-    #fsBtn { background:#14b8a6; }
-    #resetBtn { background:#f59e0b; }
-    #file { appearance:none; background:#111; color:#fff; border:1px solid #333; border-radius:10px; padding:8px; }
-    a-scene { width:100vw; height:100vh; }
+    * { box-sizing: border-box; }
+    html, body { 
+      margin: 0; 
+      padding: 0;
+      height: 100%; 
+      background: #000; 
+      color: #fff; 
+      font-family: system-ui, -apple-system, sans-serif;
+      overflow: hidden;
+    }
+    
+    /* Mensaje de instrucciones */
+    #instructions {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.9);
+      padding: 30px;
+      border-radius: 20px;
+      text-align: center;
+      z-index: 100;
+      max-width: 90%;
+      border: 2px solid #0a84ff;
+    }
+    
+    #instructions h2 {
+      margin: 0 0 20px 0;
+      color: #0a84ff;
+      font-size: 24px;
+    }
+    
+    #instructions p {
+      margin: 10px 0;
+      line-height: 1.6;
+      font-size: 16px;
+    }
+    
+    #instructions ol {
+      text-align: left;
+      margin: 20px 0;
+      padding-left: 20px;
+    }
+    
+    #instructions li {
+      margin: 10px 0;
+      line-height: 1.5;
+    }
+    
+    /* Panel de control */
+    #controls {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(transparent, rgba(0, 0, 0, 0.95));
+      padding: 20px;
+      z-index: 50;
+      transform: translateY(0);
+      transition: transform 0.3s ease;
+    }
+    
+    #controls.hidden {
+      transform: translateY(100%);
+    }
+    
+    .control-group {
+      margin-bottom: 15px;
+    }
+    
+    .control-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    
+    label {
+      font-size: 14px;
+      min-width: 70px;
+      font-weight: 600;
+    }
+    
+    input[type="range"] {
+      flex: 1;
+      height: 6px;
+      background: #333;
+      border-radius: 3px;
+      outline: none;
+    }
+    
+    input[type="range"]::-webkit-slider-thumb {
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      background: #0a84ff;
+      border-radius: 50%;
+      cursor: pointer;
+    }
+    
+    .value-display {
+      min-width: 50px;
+      text-align: right;
+      font-weight: 600;
+      color: #0a84ff;
+    }
+    
+    /* Botones */
+    .btn-container {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 15px;
+    }
+    
+    button {
+      flex: 1;
+      min-width: 120px;
+      padding: 14px 20px;
+      border: none;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 15px;
+      cursor: pointer;
+      transition: all 0.2s;
+      color: #fff;
+    }
+    
+    button:active {
+      transform: scale(0.95);
+    }
+    
+    #loadBtn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    
+    #enterVRBtn {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+    
+    #fullscreenBtn {
+      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    }
+    
+    #resetBtn {
+      background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+    }
+    
+    #toggleControlsBtn {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 60;
+      background: rgba(0, 0, 0, 0.7);
+      border: 2px solid #0a84ff;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      font-size: 24px;
+      padding: 0;
+      min-width: auto;
+    }
+    
+    /* Input de archivo oculto */
+    #fileInput {
+      display: none;
+    }
+    
+    /* Indicador de carga */
+    #loadingIndicator {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.9);
+      padding: 30px 50px;
+      border-radius: 20px;
+      z-index: 90;
+      display: none;
+      border: 2px solid #0a84ff;
+    }
+    
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 4px solid #333;
+      border-top-color: #0a84ff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 15px;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    /* Escena A-Frame */
+    a-scene {
+      width: 100vw;
+      height: 100vh;
+    }
+    
+    /* Responsive */
+    @media (max-width: 480px) {
+      #instructions {
+        padding: 20px;
+      }
+      
+      #instructions h2 {
+        font-size: 20px;
+      }
+      
+      #instructions p, #instructions li {
+        font-size: 14px;
+      }
+      
+      .btn-container button {
+        min-width: auto;
+        font-size: 13px;
+        padding: 12px 15px;
+      }
+    }
   </style>
 </head>
 <body>
-  <div id="msg">Carga una foto 360° equirectangular (2:1) y pulsa “Entrar en VR”. Bloquea la orientación en horizontal antes de meter el celu en el visor.</div>
+  <!-- Instrucciones iniciales -->
+  <div id="instructions">
+    <h2>📱 Visor 360° VR Cardboard</h2>
+    <p><strong>Pasos para usar:</strong></p>
+    <ol>
+      <li>Carga una imagen 360° equirectangular (2:1)</li>
+      <li>Ajusta el FOV y orientación si es necesario</li>
+      <li>Gira tu teléfono en modo horizontal (landscape)</li>
+      <li>Presiona "Entrar en VR" para modo estéreo</li>
+      <li>Coloca el teléfono en tu Google Cardboard</li>
+    </ol>
+    <button onclick="document.getElementById('instructions').style.display='none'" style="background: #0a84ff; margin-top: 10px;">Entendido ✓</button>
+  </div>
 
-  <!-- Escena VR -->
-  <a-scene vr-mode-ui="enterVRButton: #enterVRBtn" device-orientation-permission-ui="enabled: true">
-    <!-- Cámara con controles de mirada (giroscopio en móvil) -->
-    <a-entity id="rig">
-      <a-entity id="camera" camera="fov: 80" look-controls position="0 1.6 0"></a-entity>
+  <!-- Indicador de carga -->
+  <div id="loadingIndicator">
+    <div class="spinner"></div>
+    <p>Cargando imagen...</p>
+  </div>
+
+  <!-- Botón para mostrar/ocultar controles -->
+  <button id="toggleControlsBtn">⚙️</button>
+
+  <!-- Escena VR con A-Frame -->
+  <a-scene 
+    vr-mode-ui="enterVRButton: #enterVRBtn" 
+    device-orientation-permission-ui="enabled: true"
+    loading-screen="enabled: false">
+    
+    <!-- Rig de cámara (permite rotación del contenedor) -->
+    <a-entity id="rig" position="0 0 0">
+      <!-- Cámara con controles de mirada (giroscopio) -->
+      <a-entity 
+        id="camera" 
+        camera="fov: 80; active: true"
+        look-controls="reverseMouseDrag: false; touchEnabled: true; magicWindowTrackingEnabled: true"
+        position="0 1.6 0">
+      </a-entity>
     </a-entity>
 
-    <!-- Cúpula 360: la imagen se coloca por dentro (side: back) -->
-    <a-sky id="sky" color="#000" rotation="0 -90 0" material="shader: flat; side: back;"></a-sky>
+    <!-- Esfera 360° para la imagen equirectangular -->
+    <a-sky 
+      id="sky" 
+      radius="500"
+      rotation="0 -90 0"
+      material="shader: flat; side: back; color: #111;">
+    </a-sky>
   </a-scene>
 
-  <!-- UI -->
-  <div id="ui">
-    <input id="file" type="file" accept="image/*" />
-    <button id="enterVRBtn">🎬 Entrar en VR</button>
-    <button id="fsBtn">⤢ Pantalla completa</button>
-    <button id="resetBtn">↺ Reset vista</button>
-    <div class="row">
-      <label>FOV</label>
-      <input id="fov" type="range" min="40" max="110" step="1" value="80" />
-      <span id="fovVal">80°</span>
+  <!-- Panel de controles -->
+  <div id="controls">
+    <div class="control-group">
+      <div class="control-row">
+        <label>FOV</label>
+        <input id="fovSlider" type="range" min="40" max="120" step="1" value="80" />
+        <span class="value-display" id="fovValue">80°</span>
+      </div>
+      
+      <div class="control-row">
+        <label>Rotación Y</label>
+        <input id="yawSlider" type="range" min="-180" max="180" step="1" value="-90" />
+        <span class="value-display" id="yawValue">-90°</span>
+      </div>
+      
+      <div class="control-row">
+        <label>Rotación X</label>
+        <input id="pitchSlider" type="range" min="-90" max="90" step="1" value="0" />
+        <span class="value-display" id="pitchValue">0°</span>
+      </div>
     </div>
-    <div class="row">
-      <label>Giro Y</label>
-      <input id="yaw" type="range" min="-180" max="180" step="1" value="0" />
-      <span id="yawVal">0°</span>
+    
+    <div class="btn-container">
+      <button id="loadBtn">📁 Cargar Imagen</button>
+      <button id="enterVRBtn">🥽 Entrar en VR</button>
+      <button id="fullscreenBtn">⛶ Pantalla Completa</button>
+      <button id="resetBtn">↺ Resetear Vista</button>
     </div>
   </div>
 
+  <!-- Input de archivo oculto -->
+  <input type="file" id="fileInput" accept="image/*" />
+
   <script>
-    const file = document.getElementById('file');
-    const sky  = document.getElementById('sky');
-    const cameraEl = document.getElementById('camera');
-    const rigEl = document.getElementById('rig');
-    const fov = document.getElementById('fov');
-    const fovVal = document.getElementById('fovVal');
-    const yaw = document.getElementById('yaw');
-    const yawVal = document.getElementById('yawVal');
-    const fsBtn = document.getElementById('fsBtn');
+    // Referencias a elementos
+    const fileInput = document.getElementById('fileInput');
+    const loadBtn = document.getElementById('loadBtn');
+    const sky = document.getElementById('sky');
+    const camera = document.getElementById('camera');
+    const rig = document.getElementById('rig');
+    const controls = document.getElementById('controls');
+    const toggleControlsBtn = document.getElementById('toggleControlsBtn');
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    
+    // Sliders
+    const fovSlider = document.getElementById('fovSlider');
+    const fovValue = document.getElementById('fovValue');
+    const yawSlider = document.getElementById('yawSlider');
+    const yawValue = document.getElementById('yawValue');
+    const pitchSlider = document.getElementById('pitchSlider');
+    const pitchValue = document.getElementById('pitchValue');
+    
+    // Botones
     const resetBtn = document.getElementById('resetBtn');
-
-    // Cargar imagen seleccionada por el usuario
-    file.addEventListener('change', () => {
-      const img = file.files && file.files[0];
-      if (!img) return;
-      const url = URL.createObjectURL(img);
-      sky.setAttribute('src', url);
-      // A-Frame ajusta automáticamente; garantizamos que sea visto por dentro
-      sky.setAttribute('material', 'shader: flat; side: back');
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+    
+    let imageLoaded = false;
+    
+    // Cargar imagen
+    loadBtn.addEventListener('click', () => {
+      fileInput.click();
     });
-
-    // FOV
-    function applyFov() {
-      const v = parseInt(fov.value, 10);
-      fovVal.textContent = v + '°';
-      cameraEl.setAttribute('camera', 'fov', v);
+    
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      loadingIndicator.style.display = 'block';
+      
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          sky.setAttribute('src', event.target.result);
+          imageLoaded = true;
+          loadingIndicator.style.display = 'none';
+          
+          // Ocultar instrucciones si aún están visibles
+          document.getElementById('instructions').style.display = 'none';
+        };
+        img.onerror = () => {
+          loadingIndicator.style.display = 'none';
+          alert('Error al cargar la imagen');
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+    
+    // Control de FOV
+    function updateFOV() {
+      const value = parseInt(fovSlider.value);
+      fovValue.textContent = value + '°';
+      camera.setAttribute('camera', 'fov', value);
     }
-    fov.addEventListener('input', applyFov);
-    applyFov();
-
-    // Yaw (giro inicial)
-    function applyYaw(){
-      const v = parseInt(yaw.value, 10);
-      yawVal.textContent = v + '°';
-      // Rotamos el rig en Y para re-encuadrar el horizonte
-      rigEl.setAttribute('rotation', `0 ${v} 0`);
+    fovSlider.addEventListener('input', updateFOV);
+    updateFOV();
+    
+    // Control de Yaw (rotación Y del sky)
+    function updateYaw() {
+      const value = parseInt(yawSlider.value);
+      yawValue.textContent = value + '°';
+      const pitch = parseInt(pitchSlider.value);
+      sky.setAttribute('rotation', `${pitch} ${value} 0`);
     }
-    yaw.addEventListener('input', applyYaw);
-    applyYaw();
-
-    // Reset vista (resetea rig y look-controls)
+    yawSlider.addEventListener('input', updateYaw);
+    updateYaw();
+    
+    // Control de Pitch (rotación X del sky)
+    function updatePitch() {
+      const value = parseInt(pitchSlider.value);
+      pitchValue.textContent = value + '°';
+      const yaw = parseInt(yawSlider.value);
+      sky.setAttribute('rotation', `${value} ${yaw} 0`);
+    }
+    pitchSlider.addEventListener('input', updatePitch);
+    updatePitch();
+    
+    // Resetear vista
     resetBtn.addEventListener('click', () => {
-      rigEl.setAttribute('rotation', '0 0 0');
-      yaw.value = 0; yawVal.textContent = '0°';
-      const lc = cameraEl.components['look-controls'];
-      if (lc && lc.pitchObject && lc.yawObject) {
-        lc.pitchObject.rotation.x = 0;
-        lc.yawObject.rotation.y = 0;
+      // Resetear rotación del rig
+      rig.setAttribute('rotation', '0 0 0');
+      
+      // Resetear rotación del sky
+      yawSlider.value = -90;
+      pitchSlider.value = 0;
+      updateYaw();
+      updatePitch();
+      
+      // Resetear FOV
+      fovSlider.value = 80;
+      updateFOV();
+      
+      // Resetear look-controls
+      const lookControls = camera.components['look-controls'];
+      if (lookControls) {
+        if (lookControls.pitchObject) lookControls.pitchObject.rotation.x = 0;
+        if (lookControls.yawObject) lookControls.yawObject.rotation.y = 0;
       }
     });
-
+    
     // Pantalla completa
-    fsBtn.addEventListener('click', async () => {
+    fullscreenBtn.addEventListener('click', async () => {
       try {
         if (!document.fullscreenElement) {
           await document.documentElement.requestFullscreen();
+          fullscreenBtn.textContent = '⛶ Salir Pantalla Completa';
         } else {
           await document.exitFullscreen();
+          fullscreenBtn.textContent = '⛶ Pantalla Completa';
         }
-      } catch (e) { alert('Pantalla completa no disponible: ' + e.message); }
+      } catch (err) {
+        alert('Error al activar pantalla completa: ' + err.message);
+      }
     });
-
-    // Tip UX: esconder mensaje inicial
-    setTimeout(() => { const m = document.getElementById('msg'); m && (m.style.display='none'); }, 5000);
+    
+    // Toggle controles
+    let controlsVisible = true;
+    toggleControlsBtn.addEventListener('click', () => {
+      controlsVisible = !controlsVisible;
+      if (controlsVisible) {
+        controls.classList.remove('hidden');
+        toggleControlsBtn.textContent = '⚙️';
+      } else {
+        controls.classList.add('hidden');
+        toggleControlsBtn.textContent = '👁️';
+      }
+    });
+    
+    // Ocultar controles automáticamente al entrar en VR
+    const scene = document.querySelector('a-scene');
+    scene.addEventListener('enter-vr', () => {
+      controls.classList.add('hidden');
+      toggleControlsBtn.style.display = 'none';
+    });
+    
+    scene.addEventListener('exit-vr', () => {
+      controls.classList.remove('hidden');
+      toggleControlsBtn.style.display = 'block';
+      controlsVisible = true;
+    });
+    
+    // Detectar orientación del dispositivo
+    window.addEventListener('orientationchange', () => {
+      setTimeout(() => {
+        const orientation = window.orientation;
+        if (imageLoaded && (orientation === 90 || orientation === -90)) {
+          // Dispositivo en horizontal - listo para VR
+          console.log('Dispositivo en modo horizontal - listo para VR');
+        }
+      }, 100);
+    });
   </script>
 </body>
 </html>
