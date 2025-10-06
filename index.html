@@ -1,11 +1,24 @@
+Aquí tienes el código **HTML completo y corregido**.
+
+Este código incorpora todas las correcciones discutidas:
+
+1.  ✅ Inclusión correcta de **A-Frame** con el atributo `src`.
+2.  ✅ Solución para la **advertencia de luces** agregando `colorManagement: true;` al *renderer*.
+3.  ✅ Corrección en la **carga de la textura** para usar el sistema de *assets* (`#pano`) en lugar de la URL directa, asegurando que la imagen aparezca en la cúpula.
+4.  ✅ Corrección en la función `applyFov` para **actualizar correctamente** el componente `cardboard-split`.
+
+<!-- end list -->
+
+```html
 <!doctype html>
 <html lang="es">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>333Cardboard 360 con A‑Frame (Split SBS + Giroscopio)</title>
+  <title>444Cardboard 360 con A‑Frame (Split SBS + Giroscopio)</title>
   
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+
   <style>
     html, body { margin:0; height:100%; background:#000; color:#fff; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif; }
     a-scene { width:100vw; height:100vh; }
@@ -23,7 +36,10 @@
 <body>
   <div id="status">Estado: <span id="st">cargando…</span></div>
 
-  <a-scene id="scene" renderer="antialias: true" vr-mode-ui="enabled: false">
+  <a-scene 
+    id="scene" 
+    renderer="antialias: true; **colorManagement: true;**" vr-mode-ui="enabled: false"
+  >
     <a-assets id="assets" timeout="15000">
       <img id="pano" crossorigin="anonymous" />
     </a-assets>
@@ -55,38 +71,37 @@
   <script>
     const st = (t)=>{ document.getElementById('st').textContent = t; console.log('[A‑Frame Split]', t); };
 
-    // --- Componente: render estereoscópico SBS (sin WebXR) usando el renderer interno de A‑Frame ---
+    // --- Componente: render estereoscópico SBS ---
     AFRAME.registerComponent('cardboard-split', {
       schema: { ipd: {type:'number', default:0.064}, fov: {type:'number', default:80} },
       init: function(){
         const sceneEl = this.el.sceneEl;
         const renderer = sceneEl.renderer;
         const mainCamEl = document.querySelector('#camera');
-        const rigEl = this.el; // el entity que tiene este componente
+        const rigEl = this.el;
 
-        // Deshabilitar XR para evitar rutas WebXR inconsistentes en Android
+        // Deshabilitar XR y configurar renderer manual
         renderer.xr.enabled = false;
         renderer.autoClear = false;
         renderer.setScissorTest(true);
 
-        // Crea dos cámaras Three.js que usaremos manualmente
+        // Cámaras Three.js
         const fov = this.data.fov;
         this.leftCam = new THREE.PerspectiveCamera(fov, 0.5, 0.01, 2000);
         this.rightCam = new THREE.PerspectiveCamera(fov, 0.5, 0.01, 2000);
         this.leftCam.matrixAutoUpdate = false;
         this.rightCam.matrixAutoUpdate = false;
 
-        // Añadimos las cámaras al rig para que sigan la orientación
         rigEl.object3D.add(this.leftCam);
         rigEl.object3D.add(this.rightCam);
 
-        // Loop de render manual: sustituimos el animation loop de A‑Frame
+        // Loop de render manual
         const self = this;
         function renderLoop(){
           const w = renderer.domElement.width;
           const h = renderer.domElement.height;
 
-          // Ajustes de FOV y aspecto (cada ojo = mitad de la pantalla)
+          // Ajustes de FOV y aspecto
           const f = self.data.fov;
           self.leftCam.fov = self.rightCam.fov = f;
           self.leftCam.aspect = self.rightCam.aspect = (0.5*w)/h;
@@ -94,11 +109,11 @@
           self.rightCam.updateProjectionMatrix();
 
           // Posición de ojos (IPD)
-          const d = self.data.ipd * 0.5; // metros
+          const d = self.data.ipd * 0.5;
           self.leftCam.position.set(-d, 0, 0);
           self.rightCam.position.set(d, 0, 0);
 
-          // Copia la orientación de la cámara A‑Frame (controlada por look‑controls)
+          // Copia la orientación
           const q = mainCamEl.object3D.getWorldQuaternion(new THREE.Quaternion());
           self.leftCam.quaternion.copy(q);
           self.rightCam.quaternion.copy(q);
@@ -113,7 +128,6 @@
           renderer.setScissor(w/2, 0, w/2, h);
           renderer.render(sceneEl.object3D, self.rightCam);
 
-          // Pide siguiente frame
           window.requestAnimationFrame(renderLoop);
         }
         window.requestAnimationFrame(renderLoop);
@@ -132,14 +146,21 @@
     const camEl = document.getElementById('camera');
 
     file.addEventListener('change', ()=>{
-      const img = file.files && file.files[0];
-      if (!img) return;
-      const url = URL.createObjectURL(img);
+      const imgFile = file.files && file.files[0];
+      if (!imgFile) return;
+      
+      const url = URL.createObjectURL(imgFile);
+      const panoImgEl = document.getElementById('pano');
+      panoImgEl.src = url; // Establece la URL en el <img> de assets
+
       const tmp = new Image();
       tmp.onload = ()=>{
         const ratio = tmp.width / tmp.height;
         if (Math.abs(ratio-2.0) > 0.1) st(`⚠️ no parece 2:1 (${tmp.width}×${tmp.height}), igual cargamos`);
-        sky.setAttribute('src', url);
+        
+        // CORRECCIÓN 3: Usa el ID de la asset (#pano) para que A-Frame la procese correctamente
+        sky.setAttribute('src', '#pano'); 
+        
         st('textura 360 aplicada');
       };
       tmp.onerror = ()=> st('❌ no se pudo leer la imagen');
@@ -147,17 +168,16 @@
     });
 
     // FOV/Yaw
-    // Corrección para actualizar el componente 'cardboard-split'
     function applyFov(){ 
       fovVal.textContent = fovEl.value + '°'; 
+      // CORRECCIÓN 4: Pasar un objeto a setAttribute para actualizar solo el FOV
       rigEl.setAttribute('cardboard-split', { ipd: 0.064, fov: parseFloat(fovEl.value) });
     }
-    
     function applyYaw(){ yawVal.textContent = yawEl.value + '°'; rigEl.object3D.rotation.y = THREE.MathUtils.degToRad(parseInt(yawEl.value,10)); }
     fovEl.addEventListener('input', applyFov); applyFov();
     yawEl.addEventListener('input', applyYaw); applyYaw();
 
-    // Giroscopio (Android suele permitir sin prompt; incluimos botón por compatibilidad)
+    // Giroscopio
     async function enableGyro(){
       try{
         const dom = window.DeviceMotionEvent; const doe = window.DeviceOrientationEvent;
@@ -178,8 +198,8 @@
       const lc = camEl.components['look-controls']; if (lc && lc.pitchObject && lc.yawObject){ lc.pitchObject.rotation.x=0; lc.yawObject.rotation.y=0; }
     });
 
-    // Resize: A‑Frame maneja el canvas; nuestro loop toma el tamaño actual del renderer
     st('listo: carga imagen 2:1, pulsa Habilitar giroscopio y pantalla completa');
   </script>
 </body>
 </html>
+```
