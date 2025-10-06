@@ -3,49 +3,30 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>Visor 360° para Cardboard (Foto Equirectangular)</title>
-  <!-- Si ya tienes A-Frame local, usa tu ruta: <script src="./aframe.min.js"></script> -->
-  <script src="https://unpkg.com/aframe@1.5.0/dist/aframe.min.js"></script>
+  <title>222Cardboard 360 Split (Imagen Equirectangular)</title>
   <style>
     html, body { margin:0; height:100%; background:#000; color:#fff; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif; }
     #ui { position: fixed; inset: auto 0 0 0; background: linear-gradient(transparent, rgba(0,0,0,.75)); padding: 10px 12px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; z-index: 10; }
     .row { display:flex; align-items:center; gap:6px; }
     input[type="range"] { width: 140px; }
     #msg { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.55); padding: 6px 10px; border-radius: 10px; font-size: 12px; z-index: 10; }
-    #enterVRBtn, #fsBtn, #resetBtn, #gyroBtn { background:#0a84ff; border:none; color:#fff; padding:10px 12px; border-radius:10px; font-weight:600; }
+    #canvas { display:block; width:100vw; height:100vh; }
+    #status { position: fixed; right: 8px; bottom: 70px; background: rgba(0,0,0,.55); padding:6px 8px; border-radius:8px; font-size:12px; z-index: 10; }
+    button { background:#0a84ff; border:none; color:#fff; padding:10px 12px; border-radius:10px; font-weight:600; }
     #fsBtn { background:#14b8a6; }
     #resetBtn { background:#f59e0b; }
     #gyroBtn { background:#7c3aed; }
-    #file { appearance:none; background:#111; color:#fff; border:1px solid #333; border-radius:10px; padding:8px; }
-    a-scene { width:100vw; height:100vh; }
-    #status { position: fixed; right: 8px; bottom: 70px; background: rgba(0,0,0,.55); padding:6px 8px; border-radius:8px; font-size:12px; z-index: 10; }
   </style>
 </head>
 <body>
-  <div id="msg">Carga una foto 360° equirectangular (2:1). Toca <b>Habilitar giroscopio</b> en iOS para que siga el movimiento del celu. Luego <b>Entrar en VR</b> para Cardboard.</div>
+  <div id="msg">Carga una foto 360° (2:1). Este visor hace <b>split en dos ojos</b> y rota con el giroscopio en Android. No depende de WebXR.</div>
   <div id="status">Estado: <span id="st">inicializando…</span></div>
 
-  <!-- Escena VR -->
-  <a-scene id="scene" renderer="antialias: true" vr-mode-ui="enterVRButton: #enterVRBtn">
-    <a-assets id="assets" timeout="15000">
-      <img id="pano" crossorigin="anonymous" />
-    </a-assets>
+  <input id="file" type="file" accept="image/*" style="position:fixed; left:10px; top:10px; z-index:10; background:#111; color:#fff; border:1px solid #333; border-radius:10px; padding:8px;" />
+  <canvas id="canvas"></canvas>
 
-    <!-- Cámara: look-controls usa el giroscopio en móvil (también en VR) -->
-    <a-entity id="rig">
-      <a-entity id="camera" camera="fov: 80" look-controls="magicWindowTrackingEnabled: true; touchEnabled: true; mouseEnabled: true" position="0 1.6 0"></a-entity>
-    </a-entity>
-
-    <!-- ENVOLTURA ESFÉRICA INTERIOR: así se ve 360. side: back pinta la cara interna. -->
-    <a-sky id="sky" color="#222" radius="5000" material="shader: flat; side: back;"></a-sky>
-  </a-scene>
-
-  <!-- UI -->
   <div id="ui">
-    <input id="file" type="file" accept="image/*" />
-    <span id="fname" style="opacity:.8;font-size:12px"></span>
     <button id="gyroBtn">🧭 Habilitar giroscopio</button>
-    <button id="enterVRBtn">🎬 Entrar en VR</button>
     <button id="fsBtn">⤢ Pantalla completa</button>
     <button id="resetBtn">↺ Reset vista</button>
     <div class="row">
@@ -54,108 +35,161 @@
       <span id="fovVal">80°</span>
     </div>
     <div class="row">
+      <label>IPD</label>
+      <input id="ipd" type="range" min="0" max="0.12" step="0.002" value="0.064" />
+      <span id="ipdVal">64 mm</span>
+    </div>
+    <div class="row">
       <label>Giro Y</label>
       <input id="yaw" type="range" min="-180" max="180" step="1" value="0" />
       <span id="yawVal">0°</span>
     </div>
   </div>
 
+  <!-- Three.js (sin WebXR) -->
+  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
   <script>
-    const stEl = document.getElementById('st');
-    const sceneEl = document.getElementById('scene');
-    const file = document.getElementById('file');
-    const fname = document.getElementById('fname');
-    const panoImg = document.getElementById('pano');
-    const sky  = document.getElementById('sky');
-    const cameraEl = document.getElementById('camera');
-    const rigEl = document.getElementById('rig');
-    const fov = document.getElementById('fov');
-    const fovVal = document.getElementById('fovVal');
-    const yaw = document.getElementById('yaw');
-    const yawVal = document.getElementById('yawVal');
-    const fsBtn = document.getElementById('fsBtn');
-    const resetBtn = document.getElementById('resetBtn');
-    const gyroBtn = document.getElementById('gyroBtn');
+  const stEl = document.getElementById('st');
+  function setStatus(t){ stEl.textContent = t; console.log('[split360]', t); }
 
-    function setStatus(t){ stEl.textContent = t; console.log('[360]', t); }
+  const canvas = document.getElementById('canvas');
+  const renderer = new THREE.WebGLRenderer({canvas, antialias: true, alpha: false});
+  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio||1));
+  renderer.autoClear = false; // usaremos scissor para cada ojo
+  renderer.setScissorTest(true);
 
-    // Escena lista
-    sceneEl.addEventListener('loaded', () => setStatus('escena cargada'));
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x000000);
 
-    // Carga imagen → aplicamos a <a-sky>
-    file.addEventListener('change', () => {
-      const img = file.files && file.files[0];
-      if (!img) return;
-      fname.textContent = img.name;
-      const url = URL.createObjectURL(img);
-      const tmp = new Image();
-      tmp.onload = () => {
-        const ratio = tmp.width / tmp.height;
-        if (Math.abs(ratio - 2.0) > 0.1) {
-          setStatus(`⚠️ La imagen no parece 2:1 (${tmp.width}×${tmp.height}). Igual la cargo.`);
-        } else {
-          setStatus(`dimensiones OK (${tmp.width}×${tmp.height})`);
-        }
-        panoImg.onload = () => {
-          sky.setAttribute('src', '#pano');
-          setStatus('textura aplicada al cielo 360');
-        };
-        panoImg.src = url;
-      };
-      tmp.onerror = () => { setStatus('❌ No se pudo leer la imagen'); };
-      tmp.src = url;
+  // Esfera invertida (vemos la cara interior)
+  const sphereGeom = new THREE.SphereGeometry(50, 64, 32); // radio grande
+  sphereGeom.scale(-1, 1, 1); // invertir para mirar desde dentro
+  let sphereMat = new THREE.MeshBasicMaterial({ color: 0x222222, side: THREE.BackSide });
+  const sphere = new THREE.Mesh(sphereGeom, sphereMat);
+  scene.add(sphere);
+
+  // Dos cámaras (izquierda/derecha). Monoscópico: la diferencia de IPD no genera parallax real en un skybox, pero hacemos split correcto.
+  const fovEl = document.getElementById('fov');
+  const fovVal = document.getElementById('fovVal');
+  const yawEl = document.getElementById('yaw');
+  const yawVal = document.getElementById('yawVal');
+  const ipdEl = document.getElementById('ipd');
+  const ipdVal = document.getElementById('ipdVal');
+
+  let fov = parseInt(fovEl.value,10);
+  const leftCam = new THREE.PerspectiveCamera(fov, 0.5, 0.01, 200);
+  const rightCam = new THREE.PerspectiveCamera(fov, 0.5, 0.01, 200);
+  let ipd = parseFloat(ipdEl.value); // en metros
+
+  const rig = new THREE.Object3D();
+  scene.add(rig);
+  rig.add(leftCam); rig.add(rightCam);
+
+  function updateCameras(){
+    fov = parseInt(fovEl.value,10); fovVal.textContent = fov + '°';
+    leftCam.fov = rightCam.fov = fov;
+    leftCam.updateProjectionMatrix(); rightCam.updateProjectionMatrix();
+
+    ipd = parseFloat(ipdEl.value); ipdVal.textContent = Math.round(ipd*1000) + ' mm';
+    leftCam.position.set(-ipd/2, 0, 0);
+    rightCam.position.set(ipd/2, 0, 0);
+  }
+  updateCameras();
+
+  fovEl.addEventListener('input', updateCameras);
+  ipdEl.addEventListener('input', updateCameras);
+
+  // Yaw manual
+  function applyYaw(){
+    const y = parseInt(yawEl.value,10); yawVal.textContent = y + '°';
+    rig.rotation.y = THREE.MathUtils.degToRad(y);
+  }
+  yawEl.addEventListener('input', applyYaw); applyYaw();
+
+  // Device orientation → rotación del rig (Android)
+  let haveSensors = false;
+  function eulerFromDevice(alpha, beta, gamma){
+    // alpha: Z (0..360), beta: X (-180..180), gamma: Y (-90..90)
+    const euler = new THREE.Euler();
+    // Convención aproximada para cámara en modo paisaje con la pantalla hacia ti
+    euler.set(THREE.MathUtils.degToRad(beta||0), THREE.MathUtils.degToRad(alpha||0), THREE.MathUtils.degToRad(-gamma||0), 'YXZ');
+    return new THREE.Quaternion().setFromEuler(euler);
+  }
+  async function enableGyro(){
+    try{
+      const dom = window.DeviceMotionEvent;
+      const doe = window.DeviceOrientationEvent;
+      if (dom && typeof dom.requestPermission === 'function') { await dom.requestPermission(); }
+      if (doe && typeof doe.requestPermission === 'function') { await doe.requestPermission(); }
+      haveSensors = true;
+      window.addEventListener('deviceorientation', (e)=>{
+        const q = eulerFromDevice(e.alpha, e.beta, e.gamma);
+        rig.quaternion.slerp(q, 0.25); // suavizar
+      }, true);
+      setStatus('giroscopio habilitado');
+      try{ await screen.orientation.lock('landscape'); }catch(_){ }
+    }catch(err){ setStatus('⚠️ No se pudo habilitar giroscopio: '+err.message); }
+  }
+  document.getElementById('gyroBtn').addEventListener('click', enableGyro);
+
+  // Cargar imagen
+  const file = document.getElementById('file');
+  file.addEventListener('change', () => {
+    const img = file.files && file.files[0];
+    if (!img) return;
+    const url = URL.createObjectURL(img);
+    const texture = new THREE.TextureLoader().load(url, ()=>{
+      setStatus('textura 360 cargada');
+      sphere.material.dispose();
+      sphereMat = new THREE.MeshBasicMaterial({ map: texture, side: THREE.BackSide });
+      sphere.material = sphereMat;
+    }, undefined, (err)=>{
+      setStatus('❌ Error cargando textura'); console.error(err);
     });
+  });
 
-    // Habilitar giroscopio (necesario en iOS 13+ por gesto del usuario)
-    async function enableGyro(){
-      try {
-        // iOS: DeviceMotionEvent/DeviceOrientationEvent requieren permiso explícito
-        const dom = window.DeviceMotionEvent;
-        const doe = window.DeviceOrientationEvent;
-        if (dom && typeof dom.requestPermission === 'function') {
-          const s1 = await dom.requestPermission();
-          setStatus('permiso motion: ' + s1);
-        }
-        if (doe && typeof doe.requestPermission === 'function') {
-          const s2 = await doe.requestPermission();
-          setStatus('permiso orientation: ' + s2);
-        }
-        // A-Frame look-controls ya escucha sensores; forzamos re-init
-        const lc = cameraEl.components['look-controls'];
-        if (lc && lc.hasOwnProperty('updateDelta')) {
-          lc.update(0);
-        }
-      } catch(e){
-        console.warn(e); setStatus('⚠️ No se pudo habilitar giroscopio: ' + e.message);
-      }
-    }
-    gyroBtn.addEventListener('click', enableGyro);
+  function resize(){
+    const dpr = Math.min(2, window.devicePixelRatio||1);
+    const w = window.innerWidth, h = window.innerHeight;
+    renderer.setSize(w, h, false);
+    // Aspecto de cada ojo es (w/2)/h
+    leftCam.aspect = 0.5 * w / h; rightCam.aspect = 0.5 * w / h;
+    leftCam.updateProjectionMatrix(); rightCam.updateProjectionMatrix();
+  }
+  window.addEventListener('resize', resize); resize();
 
-    // FOV y Yaw
-    function applyFov() { const v = parseInt(fov.value, 10); fovVal.textContent = v + '°'; cameraEl.setAttribute('camera', 'fov', v); }
-    function applyYaw(){ const v = parseInt(yaw.value, 10); yawVal.textContent = v + '°'; rigEl.setAttribute('rotation', `0 ${v} 0`); }
-    fov.addEventListener('input', applyFov); applyFov();
-    yaw.addEventListener('input', applyYaw); applyYaw();
+  // Render con scissor: mitad izquierda → ojo izquierdo, mitad derecha → ojo derecho
+  function render(){
+    const w = renderer.domElement.width;  // tamaño interno (en px reales)
+    const h = renderer.domElement.height;
+    renderer.clear();
 
-    // Reset
-    resetBtn.addEventListener('click', () => {
-      rigEl.setAttribute('rotation', '0 0 0');
-      yaw.value = 0; yawVal.textContent = '0°';
-      const lc = cameraEl.components['look-controls'];
-      if (lc && lc.pitchObject && lc.yawObject) {
-        lc.pitchObject.rotation.x = 0;
-        lc.yawObject.rotation.y = 0;
-      }
-      setStatus('vista reiniciada');
-    });
+    // Izquierda
+    renderer.setViewport(0, 0, w/2, h);
+    renderer.setScissor(0, 0, w/2, h);
+    renderer.render(scene, leftCam);
 
-    // Pantalla completa
-    fsBtn.addEventListener('click', async () => {
-      try {
-        if (!document.fullscreenElement) { await document.documentElement.requestFullscreen(); setStatus('pantalla completa'); }
-        else { await document.exitFullscreen(); setStatus('salió de pantalla completa'); }
-      } catch (e) { alert('Pantalla completa no disponible: ' + e.message); }
-    });
+    // Derecha
+    renderer.setViewport(w/2, 0, w/2, h);
+    renderer.setScissor(w/2, 0, w/2, h);
+    renderer.render(scene, rightCam);
+
+    requestAnimationFrame(render);
+  }
+  render();
+
+  // Pantalla completa y reset
+  document.getElementById('fsBtn').addEventListener('click', async ()=>{
+    try{ if(!document.fullscreenElement){ await document.documentElement.requestFullscreen(); setStatus('pantalla completa'); } else { await document.exitFullscreen(); setStatus('salió de pantalla completa'); } }catch(e){ alert('Pantalla completa no disponible: '+e.message); }
+  });
+  document.getElementById('resetBtn').addEventListener('click', ()=>{
+    rig.rotation.set(0,0,0); yawEl.value = 0; yawVal.textContent = '0°'; setStatus('vista reiniciada');
+  });
+
+  // Mantener la pantalla activa (best-effort)
+  if ('wakeLock' in navigator) { navigator.wakeLock.request('screen').catch(()=>{}); }
+
+  setStatus('listo: carga una imagen y habilita giroscopio');
   </script>
 </body>
 </html>
