@@ -4,8 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <title>333Cardboard 360 con A‑Frame (Split SBS + Giroscopio)</title>
-  <!-- Usa tu copia local si ya la tienes: <script src="./aframe.min.js"></script> -->
   
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <style>
     html, body { margin:0; height:100%; background:#000; color:#fff; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif; }
     a-scene { width:100vw; height:100vh; }
@@ -20,26 +20,21 @@
     #gyroBtn { background:#7c3aed; }
   </style>
 </head>
-<script "./aframe.min.js"></script>
 <body>
   <div id="status">Estado: <span id="st">cargando…</span></div>
 
-  <!-- ESCENA A‑FRAME (sin WebXR; render estereoscópico manual con Three.js interno) -->
   <a-scene id="scene" renderer="antialias: true" vr-mode-ui="enabled: false">
     <a-assets id="assets" timeout="15000">
       <img id="pano" crossorigin="anonymous" />
     </a-assets>
 
-    <!-- Rig + Cámara con look-controls (usa giroscopio en Android) -->
     <a-entity id="rig" cardboard-split="ipd: 0.064; fov: 80">
       <a-entity id="camera" camera="active: false; fov: 80" look-controls="magicWindowTrackingEnabled: true; touchEnabled: true; mouseEnabled: true" position="0 1.6 0"></a-entity>
     </a-entity>
 
-    <!-- Cúpula 360; la textura se asigna al cargar imagen -->
     <a-sky id="sky" color="#222" radius="5000" material="shader: flat; side: back"></a-sky>
   </a-scene>
 
-  <!-- UI -->
   <div id="ui">
     <input id="file" type="file" accept="image/*" />
     <button id="gyroBtn">🧭 Habilitar giroscopio</button>
@@ -152,7 +147,12 @@
     });
 
     // FOV/Yaw
-    function applyFov(){ fovVal.textContent = fovEl.value + '°'; rigEl.setAttribute('cardboard-split', `ipd: ${rigEl.getAttribute('cardboard-split').ipd}; fov: ${fovEl.value}`); }
+    // Corrección para actualizar el componente 'cardboard-split'
+    function applyFov(){ 
+      fovVal.textContent = fovEl.value + '°'; 
+      rigEl.setAttribute('cardboard-split', { ipd: 0.064, fov: parseFloat(fovEl.value) });
+    }
+    
     function applyYaw(){ yawVal.textContent = yawEl.value + '°'; rigEl.object3D.rotation.y = THREE.MathUtils.degToRad(parseInt(yawEl.value,10)); }
     fovEl.addEventListener('input', applyFov); applyFov();
     yawEl.addEventListener('input', applyYaw); applyYaw();
@@ -183,7 +183,3 @@
   </script>
 </body>
 </html>
-
-
-
-
