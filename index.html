@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <title>Visor 360° para Cardboard (Foto Equirectangular)</title>
-  <!-- A-Frame (VR/WebXR y split para Cardboard) -->
+  <!-- Si ya tienes A-Frame local, usa tu ruta: <script src="./aframe.min.js"></script> -->
   <script src="https://unpkg.com/aframe@1.5.0/dist/aframe.min.js"></script>
   <style>
     html, body { margin:0; height:100%; background:#000; color:#fff; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif; }
@@ -12,31 +12,31 @@
     .row { display:flex; align-items:center; gap:6px; }
     input[type="range"] { width: 140px; }
     #msg { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.55); padding: 6px 10px; border-radius: 10px; font-size: 12px; z-index: 10; }
-    #enterVRBtn, #fsBtn, #resetBtn { background:#0a84ff; border:none; color:#fff; padding:10px 12px; border-radius:10px; font-weight:600; }
+    #enterVRBtn, #fsBtn, #resetBtn, #gyroBtn { background:#0a84ff; border:none; color:#fff; padding:10px 12px; border-radius:10px; font-weight:600; }
     #fsBtn { background:#14b8a6; }
     #resetBtn { background:#f59e0b; }
+    #gyroBtn { background:#7c3aed; }
     #file { appearance:none; background:#111; color:#fff; border:1px solid #333; border-radius:10px; padding:8px; }
     a-scene { width:100vw; height:100vh; }
     #status { position: fixed; right: 8px; bottom: 70px; background: rgba(0,0,0,.55); padding:6px 8px; border-radius:8px; font-size:12px; z-index: 10; }
   </style>
 </head>
 <body>
-  <div id="msg">Carga una foto 360° equirectangular (2:1). Si ves la pantalla en negro, revisa el indicador de estado abajo a la derecha.</div>
+  <div id="msg">Carga una foto 360° equirectangular (2:1). Toca <b>Habilitar giroscopio</b> en iOS para que siga el movimiento del celu. Luego <b>Entrar en VR</b> para Cardboard.</div>
   <div id="status">Estado: <span id="st">inicializando…</span></div>
 
   <!-- Escena VR -->
-  <a-scene id="scene" renderer="antialias: true" vr-mode-ui="enterVRButton: #enterVRBtn" device-orientation-permission-ui="enabled: true">
-    <!-- Pre-cargador de assets: aquí inyectamos la imagen del usuario -->
+  <a-scene id="scene" renderer="antialias: true" vr-mode-ui="enterVRButton: #enterVRBtn">
     <a-assets id="assets" timeout="15000">
       <img id="pano" crossorigin="anonymous" />
     </a-assets>
 
-    <!-- Cámara con giroscopio en móvil -->
+    <!-- Cámara: look-controls usa el giroscopio en móvil (también en VR) -->
     <a-entity id="rig">
-      <a-entity id="camera" camera="fov: 80" look-controls position="0 1.6 0"></a-entity>
+      <a-entity id="camera" camera="fov: 80" look-controls="magicWindowTrackingEnabled: true; touchEnabled: true; mouseEnabled: true" position="0 1.6 0"></a-entity>
     </a-entity>
 
-    <!-- Cúpula 360: color por defecto para verificar que renderiza -->
+    <!-- ENVOLTURA ESFÉRICA INTERIOR: así se ve 360. side: back pinta la cara interna. -->
     <a-sky id="sky" color="#222" radius="5000" material="shader: flat; side: back;"></a-sky>
   </a-scene>
 
@@ -44,6 +44,7 @@
   <div id="ui">
     <input id="file" type="file" accept="image/*" />
     <span id="fname" style="opacity:.8;font-size:12px"></span>
+    <button id="gyroBtn">🧭 Habilitar giroscopio</button>
     <button id="enterVRBtn">🎬 Entrar en VR</button>
     <button id="fsBtn">⤢ Pantalla completa</button>
     <button id="resetBtn">↺ Reset vista</button>
@@ -64,7 +65,6 @@
     const sceneEl = document.getElementById('scene');
     const file = document.getElementById('file');
     const fname = document.getElementById('fname');
-    const assets = document.getElementById('assets');
     const panoImg = document.getElementById('pano');
     const sky  = document.getElementById('sky');
     const cameraEl = document.getElementById('camera');
@@ -75,28 +75,19 @@
     const yawVal = document.getElementById('yawVal');
     const fsBtn = document.getElementById('fsBtn');
     const resetBtn = document.getElementById('resetBtn');
+    const gyroBtn = document.getElementById('gyroBtn');
 
     function setStatus(t){ stEl.textContent = t; console.log('[360]', t); }
 
-    // Diagnóstico básico de WebGL/A-Frame
+    // Escena lista
     sceneEl.addEventListener('loaded', () => setStatus('escena cargada'));
-    sceneEl.addEventListener('rendererinitialized', () => setStatus('renderer listo'));
-    sceneEl.addEventListener('enter-vr', () => setStatus('VR activado'));
-    sceneEl.addEventListener('exit-vr', () => setStatus('VR desactivado'));
 
-    // Contexto WebGL perdido (imágenes gigantes pueden provocarlo)
-    window.addEventListener('webglcontextlost', (e)=>{ e.preventDefault(); setStatus('⚠️ WebGL perdido (imagen muy grande o memoria). Prueba con 4096×2048 o 8192×4096).'); alert('WebGL perdido. Reduce la resolución de la foto (p.ej. 4096×2048) y vuelve a intentar.'); }, {capture:true});
-
-    // Cargar imagen seleccionada por el usuario a través del pipeline de <a-assets>
+    // Carga imagen → aplicamos a <a-sky>
     file.addEventListener('change', () => {
       const img = file.files && file.files[0];
       if (!img) return;
       fname.textContent = img.name;
-
       const url = URL.createObjectURL(img);
-      setStatus('cargando imagen…');
-
-      // Validar dimensiones (aprox 2:1) antes de asignar a sky
       const tmp = new Image();
       tmp.onload = () => {
         const ratio = tmp.width / tmp.height;
@@ -105,51 +96,48 @@
         } else {
           setStatus(`dimensiones OK (${tmp.width}×${tmp.height})`);
         }
-        // Inyectamos en <a-assets> y luego referenciamos por id
         panoImg.onload = () => {
-          setStatus('imagen en assets, aplicando a sky…');
           sky.setAttribute('src', '#pano');
-        };
-        panoImg.onerror = (e) => {
-          console.error('Error en <img id=pano>:', e);
-          setStatus('❌ Error cargando la imagen (assets)');
+          setStatus('textura aplicada al cielo 360');
         };
         panoImg.src = url;
       };
-      tmp.onerror = () => {
-        setStatus('❌ No se pudo leer la imagen');
-        alert('No se pudo leer la imagen. Prueba con un JPG/PNG estándar.');
-      };
+      tmp.onerror = () => { setStatus('❌ No se pudo leer la imagen'); };
       tmp.src = url;
     });
 
-    // Eventos de material/textura en el sky
-    function bindSkyDebug(){
-      ['materialtextureloaded','material-texture-loaded','loaded'].forEach(ev => {
-        sky.addEventListener(ev, () => setStatus(`sky: ${ev}`));
-      });
+    // Habilitar giroscopio (necesario en iOS 13+ por gesto del usuario)
+    async function enableGyro(){
+      try {
+        // iOS: DeviceMotionEvent/DeviceOrientationEvent requieren permiso explícito
+        const dom = window.DeviceMotionEvent;
+        const doe = window.DeviceOrientationEvent;
+        if (dom && typeof dom.requestPermission === 'function') {
+          const s1 = await dom.requestPermission();
+          setStatus('permiso motion: ' + s1);
+        }
+        if (doe && typeof doe.requestPermission === 'function') {
+          const s2 = await doe.requestPermission();
+          setStatus('permiso orientation: ' + s2);
+        }
+        // A-Frame look-controls ya escucha sensores; forzamos re-init
+        const lc = cameraEl.components['look-controls'];
+        if (lc && lc.hasOwnProperty('updateDelta')) {
+          lc.update(0);
+        }
+      } catch(e){
+        console.warn(e); setStatus('⚠️ No se pudo habilitar giroscopio: ' + e.message);
+      }
     }
-    bindSkyDebug();
+    gyroBtn.addEventListener('click', enableGyro);
 
-    // FOV
-    function applyFov() {
-      const v = parseInt(fov.value, 10);
-      fovVal.textContent = v + '°';
-      cameraEl.setAttribute('camera', 'fov', v);
-    }
-    fov.addEventListener('input', applyFov);
-    applyFov();
+    // FOV y Yaw
+    function applyFov() { const v = parseInt(fov.value, 10); fovVal.textContent = v + '°'; cameraEl.setAttribute('camera', 'fov', v); }
+    function applyYaw(){ const v = parseInt(yaw.value, 10); yawVal.textContent = v + '°'; rigEl.setAttribute('rotation', `0 ${v} 0`); }
+    fov.addEventListener('input', applyFov); applyFov();
+    yaw.addEventListener('input', applyYaw); applyYaw();
 
-    // Yaw (giro inicial)
-    function applyYaw(){
-      const v = parseInt(yaw.value, 10);
-      yawVal.textContent = v + '°';
-      rigEl.setAttribute('rotation', `0 ${v} 0`);
-    }
-    yaw.addEventListener('input', applyYaw);
-    applyYaw();
-
-    // Reset vista (resetea rig y look-controls)
+    // Reset
     resetBtn.addEventListener('click', () => {
       rigEl.setAttribute('rotation', '0 0 0');
       yaw.value = 0; yawVal.textContent = '0°';
@@ -164,18 +152,10 @@
     // Pantalla completa
     fsBtn.addEventListener('click', async () => {
       try {
-        if (!document.fullscreenElement) {
-          await document.documentElement.requestFullscreen();
-          setStatus('pantalla completa');
-        } else {
-          await document.exitFullscreen();
-          setStatus('salió de pantalla completa');
-        }
+        if (!document.fullscreenElement) { await document.documentElement.requestFullscreen(); setStatus('pantalla completa'); }
+        else { await document.exitFullscreen(); setStatus('salió de pantalla completa'); }
       } catch (e) { alert('Pantalla completa no disponible: ' + e.message); }
     });
-
-    // Tip UX: esconder mensaje inicial
-    setTimeout(() => { const m = document.getElementById('msg'); m && (m.style.display='none'); }, 5000);
   </script>
 </body>
 </html>
