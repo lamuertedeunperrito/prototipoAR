@@ -1,21 +1,9 @@
-Aquí tienes el código **HTML completo y corregido**.
-
-Este código incorpora todas las correcciones discutidas:
-
-1.  ✅ Inclusión correcta de **A-Frame** con el atributo `src`.
-2.  ✅ Solución para la **advertencia de luces** agregando `colorManagement: true;` al *renderer*.
-3.  ✅ Corrección en la **carga de la textura** para usar el sistema de *assets* (`#pano`) en lugar de la URL directa, asegurando que la imagen aparezca en la cúpula.
-4.  ✅ Corrección en la función `applyFov` para **actualizar correctamente** el componente `cardboard-split`.
-
-<!-- end list -->
-
-```html
 <!doctype html>
 <html lang="es">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>444Cardboard 360 con A‑Frame (Split SBS + Giroscopio)</title>
+  <title>555Cardboard 360 con A‑Frame (Split SBS + Giroscopio)</title>
   
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 
@@ -38,7 +26,7 @@ Este código incorpora todas las correcciones discutidas:
 
   <a-scene 
     id="scene" 
-    renderer="antialias: true; **colorManagement: true;**" vr-mode-ui="enabled: false"
+    renderer="antialias: true;colorManagement:true;" vr-mode-ui="enabled: false"
   >
     <a-assets id="assets" timeout="15000">
       <img id="pano" crossorigin="anonymous" />
@@ -69,6 +57,7 @@ Este código incorpora todas las correcciones discutidas:
   </div>
 
   <script>
+    // Inicializador del estado
     const st = (t)=>{ document.getElementById('st').textContent = t; console.log('[A‑Frame Split]', t); };
 
     // --- Componente: render estereoscópico SBS ---
@@ -80,12 +69,10 @@ Este código incorpora todas las correcciones discutidas:
         const mainCamEl = document.querySelector('#camera');
         const rigEl = this.el;
 
-        // Deshabilitar XR y configurar renderer manual
         renderer.xr.enabled = false;
         renderer.autoClear = false;
         renderer.setScissorTest(true);
 
-        // Cámaras Three.js
         const fov = this.data.fov;
         this.leftCam = new THREE.PerspectiveCamera(fov, 0.5, 0.01, 2000);
         this.rightCam = new THREE.PerspectiveCamera(fov, 0.5, 0.01, 2000);
@@ -95,25 +82,21 @@ Este código incorpora todas las correcciones discutidas:
         rigEl.object3D.add(this.leftCam);
         rigEl.object3D.add(this.rightCam);
 
-        // Loop de render manual
         const self = this;
         function renderLoop(){
           const w = renderer.domElement.width;
           const h = renderer.domElement.height;
 
-          // Ajustes de FOV y aspecto
           const f = self.data.fov;
           self.leftCam.fov = self.rightCam.fov = f;
           self.leftCam.aspect = self.rightCam.aspect = (0.5*w)/h;
           self.leftCam.updateProjectionMatrix();
           self.rightCam.updateProjectionMatrix();
 
-          // Posición de ojos (IPD)
           const d = self.data.ipd * 0.5;
           self.leftCam.position.set(-d, 0, 0);
           self.rightCam.position.set(d, 0, 0);
 
-          // Copia la orientación
           const q = mainCamEl.object3D.getWorldQuaternion(new THREE.Quaternion());
           self.leftCam.quaternion.copy(q);
           self.rightCam.quaternion.copy(q);
@@ -151,14 +134,14 @@ Este código incorpora todas las correcciones discutidas:
       
       const url = URL.createObjectURL(imgFile);
       const panoImgEl = document.getElementById('pano');
-      panoImgEl.src = url; // Establece la URL en el <img> de assets
+      panoImgEl.src = url; // Asigna la URL al <img> de assets
 
       const tmp = new Image();
       tmp.onload = ()=>{
         const ratio = tmp.width / tmp.height;
         if (Math.abs(ratio-2.0) > 0.1) st(`⚠️ no parece 2:1 (${tmp.width}×${tmp.height}), igual cargamos`);
         
-        // CORRECCIÓN 3: Usa el ID de la asset (#pano) para que A-Frame la procese correctamente
+        // CORRECCIÓN 3: Usa el ID de la asset (#pano) para que la textura sea visible
         sky.setAttribute('src', '#pano'); 
         
         st('textura 360 aplicada');
@@ -170,7 +153,7 @@ Este código incorpora todas las correcciones discutidas:
     // FOV/Yaw
     function applyFov(){ 
       fovVal.textContent = fovEl.value + '°'; 
-      // CORRECCIÓN 4: Pasar un objeto a setAttribute para actualizar solo el FOV
+      // Pasar un objeto a setAttribute para actualizar solo el FOV del componente
       rigEl.setAttribute('cardboard-split', { ipd: 0.064, fov: parseFloat(fovEl.value) });
     }
     function applyYaw(){ yawVal.textContent = yawEl.value + '°'; rigEl.object3D.rotation.y = THREE.MathUtils.degToRad(parseInt(yawEl.value,10)); }
@@ -202,4 +185,3 @@ Este código incorpora todas las correcciones discutidas:
   </script>
 </body>
 </html>
-```
