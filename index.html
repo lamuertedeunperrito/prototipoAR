@@ -1,193 +1,197 @@
 <!doctype html>
 <html lang="es">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>888Cardboard 360 con A‑Frame (SBS + Gyro) — FIX móvil</title>
-  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-  <style>
-    html, body { margin:0; height:100%; background:#000; color:#fff; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif; }
-    a-scene { width:100vw; height:100vh; }
-    #ui { position: fixed; inset: auto 0 0 0; background: linear-gradient(transparent, rgba(0,0,0,.75)); padding: 10px 12px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; z-index: 10; }
-    .row { display:flex; align-items:center; gap:6px; }
-    input[type="range"] { width: 140px; }
-    #status { position: fixed; right: 8px; bottom: 70px; background: rgba(0,0,0,.55); padding:6px 8px; border-radius:8px; font-size:12px; z-index: 10; }
-    #file { appearance:none; background:#111; color:#fff; border:1px solid #333; border-radius:10px; padding:8px; }
-    button { background:#0a84ff; border:none; color:#fff; padding:10px 12px; border-radius:10px; font-weight:600; }
-    #fsBtn { background:#14b8a6; }
-    #resetBtn { background:#f59e0b; }
-    #gyroBtn { background:#7c3aed; }
-  </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>999Cardboard 360 con A‑Frame (SBS + Gyro) — FIX móvil</title>
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <style>
+    html, body { margin:0; height:100%; background:#000; color:#fff; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif; }
+    a-scene { width:100vw; height:100vh; }
+    #ui { position: fixed; inset: auto 0 0 0; background: linear-gradient(transparent, rgba(0,0,0,.75)); padding: 10px 12px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; z-index: 10; }
+    .row { display:flex; align-items:center; gap:6px; }
+    input[type="range"] { width: 140px; }
+    #status { position: fixed; right: 8px; bottom: 70px; background: rgba(0,0,0,.55); padding:6px 8px; border-radius:8px; font-size:12px; z-index: 10; }
+    #file { appearance:none; background:#111; color:#fff; border:1px solid #333; border-radius:10px; padding:8px; }
+    button { background:#0a84ff; border:none; color:#fff; padding:10px 12px; border-radius:10px; font-weight:600; }
+    #fsBtn { background:#14b8a6; }
+    #resetBtn { background:#f59e0b; }
+    #gyroBtn { background:#7c3aed; }
+  </style>
 </head>
 <body>
-  <div id="status">Estado: <span id="st">inicializando…</span></div>
+  <div id="status">Estado: <span id="st">inicializando…</span></div>
 
-  <a-scene id="scene" renderer="antialias: true; colorManagement: true" vr-mode-ui="enabled: false">
-    <a-entity id="rig">
-      <a-entity id="camera" camera="active:false; fov:80" look-controls="magicWindowTrackingEnabled:true; touchEnabled:true; mouseEnabled:true" position="0 1.6 0"></a-entity>
-    </a-entity>
-    <a-sky id="sky" color="#222" radius="5000" material="shader: flat; side: back"></a-sky>
-  </a-scene>
+    <a-scene id="scene" renderer="antialias: true;" vr-mode-ui="enabled: false">
+    <a-entity id="rig">
+      <a-entity id="camera" camera="active:false; fov:80" look-controls="magicWindowTrackingEnabled:true; touchEnabled:true; mouseEnabled:true" position="0 1.6 0"></a-entity>
+    </a-entity>
+        <a-sky id="sky" color="#FFF" radius="5000" material="shader: flat; side: back"></a-sky>
+  </a-scene>
 
-  <div id="ui">
-    <input id="file" type="file" accept="image/jpeg,image/png" />
-    <button id="gyroBtn">🧭 Habilitar giroscopio</button>
-    <button id="fsBtn">⤢ Pantalla completa</button>
-    <button id="resetBtn">↺ Reset vista</button>
-    <div class="row">
-      <label>FOV</label>
-      <input id="fov" type="range" min="40" max="110" step="1" value="80" />
-      <span id="fovVal">80°</span>
-    </div>
-    <div class="row">
-      <label>Yaw</label>
-      <input id="yaw" type="range" min="-180" max="180" step="1" value="0" />
-      <span id="yawVal">0°</span>
-    </div>
-  </div>
+  <div id="ui">
+    <input id="file" type="file" accept="image/jpeg,image/png" />
+    <button id="gyroBtn">🧭 Habilitar giroscopio</button>
+    <button id="fsBtn">⤢ Pantalla completa</button>
+    <button id="resetBtn">↺ Reset vista</button>
+    <div class="row">
+      <label>FOV</label>
+      <input id="fov" type="range" min="40" max="110" step="1" value="80" />
+      <span id="fovVal">80°</span>
+    </div>
+    <div class="row">
+      <label>Yaw</label>
+      <input id="yaw" type="range" min="-180" max="180" step="1" value="0" />
+      <span id="yawVal">0°</span>
+    </div>
+  </div>
 
-  <script>
-  (function(){
-    const st = (t)=>{ const el=document.getElementById('st'); if (el) el.textContent=t; console.log('[A‑Frame SBS]', t); };
+  <script>
+  (function(){
+    const st = (t)=>{ const el=document.getElementById('st'); if (el) el.textContent=t; console.log('[A‑Frame SBS]', t); };
 
-    // 1) Componente: render SBS controlando el bucle del renderer de A‑Frame (evita doble render)
-    AFRAME.registerComponent('cardboard-sbs', {
-      schema: { ipd:{type:'number', default:0.064}, fov:{type:'number', default:80} },
-      init(){
-        const sceneEl = this.el.sceneEl;
-        const renderer = sceneEl.renderer;
-        const mainCamEl = document.querySelector('#camera');
+    // 1) Componente: render SBS controlando el bucle del renderer de A‑Frame (evita doble render)
+    AFRAME.registerComponent('cardboard-sbs', {
+      schema: { ipd:{type:'number', default:0.064}, fov:{type:'number', default:80} },
+      init(){
+        const sceneEl = this.el.sceneEl;
+        const renderer = sceneEl.renderer;
+        const mainCamEl = document.querySelector('#camera');
 
-        // Desactiva XR y toma control del animationLoop
-        renderer.xr.enabled = false;
-        renderer.autoClear = false;
-        renderer.setScissorTest(true);
+        // Desactiva XR y toma control del animationLoop
+        renderer.xr.enabled = false;
+        renderer.autoClear = false;
+        renderer.setScissorTest(true);
 
-        // Cámaras ojo izq/der
-        this.leftCam  = new THREE.PerspectiveCamera(this.data.fov, 0.5, 0.01, 2000);
-        this.rightCam = new THREE.PerspectiveCamera(this.data.fov, 0.5, 0.01, 2000);
-        this.leftCam.matrixAutoUpdate = false;
-        this.rightCam.matrixAutoUpdate = false;
-        this.el.object3D.add(this.leftCam);
-        this.el.object3D.add(this.rightCam);
+        // Cámaras ojo izq/der
+        this.leftCam  = new THREE.PerspectiveCamera(this.data.fov, 0.5, 0.01, 2000);
+        this.rightCam = new THREE.PerspectiveCamera(this.data.fov, 0.5, 0.01, 2000);
+        this.leftCam.matrixAutoUpdate = false;
+        this.rightCam.matrixAutoUpdate = false;
+        this.el.object3D.add(this.leftCam);
+        this.el.object3D.add(this.rightCam);
 
-        let last = 0;
-        const loop = (time)=>{
-          const w = renderer.domElement.width, h = renderer.domElement.height;
+        let last = 0;
+        const loop = (time)=>{
+          const w = renderer.domElement.width, h = renderer.domElement.height;
 
-          // Actualiza tick de A‑Frame para que look‑controls funcione
-          const dt = last ? (time - last) : 0; last = time;
-          sceneEl.tick(time, dt);
+          // Actualiza tick de A‑Frame para que look‑controls funcione
+          const dt = last ? (time - last) : 0; last = time;
+          sceneEl.tick(time, dt);
 
-          // FOV/aspecto
-          const fov = this.data.fov;
-          this.leftCam.fov = this.rightCam.fov = fov;
-          this.leftCam.aspect = this.rightCam.aspect = (0.5*w)/h;
-          this.leftCam.updateProjectionMatrix();
-          this.rightCam.updateProjectionMatrix();
+          // FOV/aspecto
+          const fov = this.data.fov;
+          this.leftCam.fov = this.rightCam.fov = fov;
+          this.leftCam.aspect = this.rightCam.aspect = (0.5*w)/h;
+          this.leftCam.updateProjectionMatrix();
+          this.rightCam.updateProjectionMatrix();
 
-          // IPD
-          const d = this.data.ipd * 0.5;
-          this.leftCam.position.set(-d,0,0);
-          this.rightCam.position.set(d,0,0);
+          // IPD
+          const d = this.data.ipd * 0.5;
+          this.leftCam.position.set(-d,0,0);
+          this.rightCam.position.set(d,0,0);
 
-          // Copia orientación de la cámara de A‑Frame
-          const q = mainCamEl.object3D.getWorldQuaternion(new THREE.Quaternion());
-          this.leftCam.quaternion.copy(q);
-          this.rightCam.quaternion.copy(q);
+          // Copia orientación de la cámara de A‑Frame
+          const q = mainCamEl.object3D.getWorldQuaternion(new THREE.Quaternion());
+          this.leftCam.quaternion.copy(q);
+          this.rightCam.quaternion.copy(q);
 
-          renderer.clear();
-          renderer.setViewport(0,0,w/2,h);
-          renderer.setScissor(0,0,w/2,h);
-          renderer.render(sceneEl.object3D, this.leftCam);
-          renderer.setViewport(w/2,0,w/2,h);
-          renderer.setScissor(w/2,0,w/2,h);
-          renderer.render(sceneEl.object3D, this.rightCam);
-        };
-        renderer.setAnimationLoop(loop);
-        st('✅ Split SBS activo');
-      }
-    });
+          renderer.clear();
+          renderer.setViewport(0,0,w/2,h);
+          renderer.setScissor(0,0,w/2,h);
+          renderer.render(sceneEl.object3D, this.leftCam);
+          renderer.setViewport(w/2,0,w/2,h);
+          renderer.setScissor(w/2,0,w/2,h);
+          renderer.render(sceneEl.object3D, this.rightCam);
+        };
+        renderer.setAnimationLoop(loop);
+        st('✅ Split SBS activo');
+      }
+    });
 
-    // 2) Downscale en móvil: redimensiona a máx 4096×2048 antes de aplicar (evita negro por memoria)
-    function downscaleImageToCanvas(img, maxW=4096){
-      const ratio = img.width / img.height; // debe ~2:1
-      const targetW = Math.min(maxW, img.width);
-      const targetH = Math.round(targetW / ratio);
-      const c = document.createElement('canvas');
-      c.width = targetW; c.height = targetH;
-      const ctx = c.getContext('2d');
-      ctx.drawImage(img, 0, 0, targetW, targetH);
-      return c;
-    }
+    // 2) Downscale en móvil: redimensiona a máx 4096×2048 antes de aplicar (evita negro por memoria)
+    function downscaleImageToCanvas(img, maxW=4096){
+      const ratio = img.width / img.height;
+      const targetW = Math.min(maxW, img.width);
+      const targetH = Math.round(targetW / ratio);
+      const c = document.createElement('canvas');
+      c.width = targetW; c.height = targetH;
+      const ctx = c.getContext('2d');
+      ctx.drawImage(img, 0, 0, targetW, targetH);
+      return c;
+    }
 
-    // 3) Cargar imagen y setear como textura via Three (más fiable en Android)
-    function setSkyFromCanvas(canvas){
-      const sky = document.getElementById('sky');
-      const mesh = sky.getObject3D('mesh');
-      if (!mesh) { st('⚠️ mesh de sky no listo'); return; }
-      const tex = new THREE.CanvasTexture(canvas);
-      tex.minFilter = THREE.LinearFilter;
-      tex.magFilter = THREE.LinearFilter;
-      mesh.material.map = tex;
-      mesh.material.side = THREE.BackSide;
-      mesh.material.needsUpdate = true;
-      st('🖼️ textura 360 aplicada (canvas)');
-    }
+    // 3) Cargar imagen y setear como textura via Three (más fiable en Android)
+    function setSkyFromCanvas(canvas){
+      const sky = document.getElementById('sky');
+      const mesh = sky.getObject3D('mesh');
+      if (!mesh) { st('⚠️ mesh de sky no listo'); return; }
+      
+      // Nota: Cuando se usa material="shader: flat", la textura no tiene iluminación, 
+      // pero si se activa colorManagement, se oscurece. Al desactivarlo en el renderer, 
+      // la textura se ve con su brillo original.
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.minFilter = THREE.LinearFilter;
+      tex.magFilter = THREE.LinearFilter;
+      mesh.material.map = tex;
+      mesh.material.side = THREE.BackSide;
+      mesh.material.needsUpdate = true;
+      st('🖼️ textura 360 aplicada (canvas)');
+    }
 
-    // 4) Inicialización cuando la escena esté lista
-    const sceneEl = document.getElementById('scene');
-    function onReady(){
-      st('escena cargada');
-      // Añadir componente SBS al rig
-      const rig = document.getElementById('rig');
-      rig.setAttribute('cardboard-sbs', 'ipd:0.064; fov:80');
+    // 4) Inicialización cuando la escena esté lista
+    const sceneEl = document.getElementById('scene');
+    function onReady(){
+      st('escena cargada');
+      // Añadir componente SBS al rig
+      const rig = document.getElementById('rig');
+      rig.setAttribute('cardboard-sbs', 'ipd:0.064; fov:80');
 
-      // Inputs
-      const file = document.getElementById('file');
-      const fovEl = document.getElementById('fov');
-      const fovVal = document.getElementById('fovVal');
-      const yawEl = document.getElementById('yaw');
-      const yawVal = document.getElementById('yawVal');
+      // Inputs
+      const file = document.getElementById('file');
+      const fovEl = document.getElementById('fov');
+      const fovVal = document.getElementById('fovVal');
+      const yawEl = document.getElementById('yaw');
+      const yawVal = document.getElementById('yawVal');
 
-      file.addEventListener('change', ()=>{
-        const f = file.files && file.files[0]; if(!f) return;
-        if (!/^image\/(jpeg|png)$/i.test(f.type)) { st('❌ solo JPG/PNG'); return; }
-        const url = URL.createObjectURL(f);
-        const img = new Image();
-        img.onload = ()=>{
-          // Downscale para móviles
-          const canvas = downscaleImageToCanvas(img, 4096);
-          setSkyFromCanvas(canvas);
-        };
-        img.onerror = ()=> st('❌ no se pudo leer la imagen');
-        img.src = url;
-      });
+      file.addEventListener('change', ()=>{
+        const f = file.files && file.files[0]; if(!f) return;
+        if (!/^image\/(jpeg|png)$/i.test(f.type)) { st('❌ solo JPG/PNG'); return; }
+        const url = URL.createObjectURL(f);
+        const img = new Image();
+        img.onload = ()=>{
+          // Downscale para móviles
+          const canvas = downscaleImageToCanvas(img, 4096);
+          setSkyFromCanvas(canvas);
+        };
+        img.onerror = ()=> st('❌ no se pudo leer la imagen');
+        img.src = url;
+      });
 
-      function applyFov(){ fovVal.textContent = fovEl.value + '°'; const c = rig.getAttribute('cardboard-sbs'); rig.setAttribute('cardboard-sbs', `ipd:${c.ipd}; fov:${parseFloat(fovEl.value)}`); }
-      function applyYaw(){ yawVal.textContent = yawEl.value + '°'; rig.object3D.rotation.y = THREE.MathUtils.degToRad(parseInt(yawEl.value,10)); }
-      fovEl.addEventListener('input', applyFov); applyFov();
-      yawEl.addEventListener('input', applyYaw); applyYaw();
+      function applyFov(){ fovVal.textContent = fovEl.value + '°'; const c = rig.getAttribute('cardboard-sbs'); rig.setAttribute('cardboard-sbs', `ipd:${c.ipd}; fov:${parseFloat(fovEl.value)}`); }
+      function applyYaw(){ yawVal.textContent = yawEl.value + '°'; rig.object3D.rotation.y = THREE.MathUtils.degToRad(parseInt(yawEl.value,10)); }
+      fovEl.addEventListener('input', applyFov); applyFov();
+      yawEl.addEventListener('input', applyYaw); applyYaw();
 
-      document.getElementById('gyroBtn').addEventListener('click', async ()=>{
-        try{
-          const dom = window.DeviceMotionEvent; const doe = window.DeviceOrientationEvent;
-          if (dom && typeof dom.requestPermission === 'function') await dom.requestPermission();
-          if (doe && typeof doe.requestPermission === 'function') await doe.requestPermission();
-          try{ await screen.orientation.lock('landscape'); }catch(_){ }
-          st('giroscopio habilitado');
-        }catch(e){ st('⚠️ no se pudo habilitar gyro: '+e.message); }
-      });
+      document.getElementById('gyroBtn').addEventListener('click', async ()=>{
+        try{
+          const dom = window.DeviceMotionEvent; const doe = window.DeviceOrientationEvent;
+          if (dom && typeof dom.requestPermission === 'function') await dom.requestPermission();
+          if (doe && typeof doe.requestPermission === 'function') await doe.requestPermission();
+          try{ await screen.orientation.lock('landscape'); }catch(_){ }
+          st('giroscopio habilitado');
+        }catch(e){ st('⚠️ no se pudo habilitar gyro: '+e.message); }
+      });
 
-      document.getElementById('fsBtn').addEventListener('click', async ()=>{
-        try{ if(!document.fullscreenElement){ await document.documentElement.requestFullscreen(); st('pantalla completa'); } else { await document.exitFullscreen(); st('salió de pantalla completa'); } }catch(e){ alert('No se pudo entrar a pantalla completa: '+e.message); }
-      });
-      document.getElementById('resetBtn').addEventListener('click', ()=>{
-        rig.object3D.rotation.set(0,0,0); yawEl.value=0; yawVal.textContent='0°'; st('vista reiniciada');
-      });
-    }
-    if (sceneEl.hasLoaded) onReady(); else sceneEl.addEventListener('loaded', onReady);
-  })();
-  </script>
+      document.getElementById('fsBtn').addEventListener('click', async ()=>{
+        try{ if(!document.fullscreenElement){ await document.documentElement.requestFullscreen(); st('pantalla completa'); } else { await document.exitFullscreen(); st('salió de pantalla completa'); } }catch(e){ alert('No se pudo entrar a pantalla completa: '+e.message); }
+      });
+      document.getElementById('resetBtn').addEventListener('click', ()=>{
+        rig.object3D.rotation.set(0,0,0); yawEl.value=0; yawVal.textContent='0°'; st('vista reiniciada');
+      });
+    }
+    if (sceneEl.hasLoaded) onReady(); else sceneEl.addEventListener('loaded', onReady);
+  })();
+  </script>
 </body>
 </html>
