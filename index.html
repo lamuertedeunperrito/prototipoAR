@@ -3,10 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>555Cardboard 360 con A‑Frame (Split SBS + Giroscopio)</title>
-  
+  <title>666Cardboard 360 con A‑Frame (SBS + Gyro) — FIX móvil</title>
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-
   <style>
     html, body { margin:0; height:100%; background:#000; color:#fff; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif; }
     a-scene { width:100vw; height:100vh; }
@@ -22,25 +20,17 @@
   </style>
 </head>
 <body>
-  <div id="status">Estado: <span id="st">cargando…</span></div>
+  <div id="status">Estado: <span id="st">inicializando…</span></div>
 
-  <a-scene 
-    id="scene" 
-    renderer="antialias: true;colorManagement:true;" vr-mode-ui="enabled: false"
-  >
-    <a-assets id="assets" timeout="15000">
-      <img id="pano" crossorigin="anonymous" />
-    </a-assets>
-
-    <a-entity id="rig" cardboard-split="ipd: 0.064; fov: 80">
-      <a-entity id="camera" camera="active: false; fov: 80" look-controls="magicWindowTrackingEnabled: true; touchEnabled: true; mouseEnabled: true" position="0 1.6 0"></a-entity>
+  <a-scene id="scene" renderer="antialias: true; colorManagement: true" vr-mode-ui="enabled: false">
+    <a-entity id="rig">
+      <a-entity id="camera" camera="active:false; fov:80" look-controls="magicWindowTrackingEnabled:true; touchEnabled:true; mouseEnabled:true" position="0 1.6 0"></a-entity>
     </a-entity>
-
     <a-sky id="sky" color="#222" radius="5000" material="shader: flat; side: back"></a-sky>
   </a-scene>
 
   <div id="ui">
-    <input id="file" type="file" accept="image/*" />
+    <input id="file" type="file" accept="image/jpeg,image/png" />
     <button id="gyroBtn">🧭 Habilitar giroscopio</button>
     <button id="fsBtn">⤢ Pantalla completa</button>
     <button id="resetBtn">↺ Reset vista</button>
@@ -57,131 +47,147 @@
   </div>
 
   <script>
-    // Inicializador del estado
-    const st = (t)=>{ document.getElementById('st').textContent = t; console.log('[A‑Frame Split]', t); };
+  (function(){
+    const st = (t)=>{ const el=document.getElementById('st'); if (el) el.textContent=t; console.log('[A‑Frame SBS]', t); };
 
-    // --- Componente: render estereoscópico SBS ---
-    AFRAME.registerComponent('cardboard-split', {
-      schema: { ipd: {type:'number', default:0.064}, fov: {type:'number', default:80} },
-      init: function(){
+    // 1) Componente: render SBS controlando el bucle del renderer de A‑Frame (evita doble render)
+    AFRAME.registerComponent('cardboard-sbs', {
+      schema: { ipd:{type:'number', default:0.064}, fov:{type:'number', default:80} },
+      init(){
         const sceneEl = this.el.sceneEl;
         const renderer = sceneEl.renderer;
         const mainCamEl = document.querySelector('#camera');
-        const rigEl = this.el;
 
+        // Desactiva XR y toma control del animationLoop
         renderer.xr.enabled = false;
         renderer.autoClear = false;
         renderer.setScissorTest(true);
 
-        const fov = this.data.fov;
-        this.leftCam = new THREE.PerspectiveCamera(fov, 0.5, 0.01, 2000);
-        this.rightCam = new THREE.PerspectiveCamera(fov, 0.5, 0.01, 2000);
+        // Cámaras ojo izq/der
+        this.leftCam  = new THREE.PerspectiveCamera(this.data.fov, 0.5, 0.01, 2000);
+        this.rightCam = new THREE.PerspectiveCamera(this.data.fov, 0.5, 0.01, 2000);
         this.leftCam.matrixAutoUpdate = false;
         this.rightCam.matrixAutoUpdate = false;
+        this.el.object3D.add(this.leftCam);
+        this.el.object3D.add(this.rightCam);
 
-        rigEl.object3D.add(this.leftCam);
-        rigEl.object3D.add(this.rightCam);
+        let last = 0;
+        const loop = (time)=>{
+          const w = renderer.domElement.width, h = renderer.domElement.height;
 
-        const self = this;
-        function renderLoop(){
-          const w = renderer.domElement.width;
-          const h = renderer.domElement.height;
+          // Actualiza tick de A‑Frame para que look‑controls funcione
+          const dt = last ? (time - last) : 0; last = time;
+          sceneEl.tick(time, dt);
 
-          const f = self.data.fov;
-          self.leftCam.fov = self.rightCam.fov = f;
-          self.leftCam.aspect = self.rightCam.aspect = (0.5*w)/h;
-          self.leftCam.updateProjectionMatrix();
-          self.rightCam.updateProjectionMatrix();
+          // FOV/aspecto
+          const fov = this.data.fov;
+          this.leftCam.fov = this.rightCam.fov = fov;
+          this.leftCam.aspect = this.rightCam.aspect = (0.5*w)/h;
+          this.leftCam.updateProjectionMatrix();
+          this.rightCam.updateProjectionMatrix();
 
-          const d = self.data.ipd * 0.5;
-          self.leftCam.position.set(-d, 0, 0);
-          self.rightCam.position.set(d, 0, 0);
+          // IPD
+          const d = this.data.ipd * 0.5;
+          this.leftCam.position.set(-d,0,0);
+          this.rightCam.position.set(d,0,0);
 
+          // Copia orientación de la cámara de A‑Frame
           const q = mainCamEl.object3D.getWorldQuaternion(new THREE.Quaternion());
-          self.leftCam.quaternion.copy(q);
-          self.rightCam.quaternion.copy(q);
+          this.leftCam.quaternion.copy(q);
+          this.rightCam.quaternion.copy(q);
 
           renderer.clear();
-          // OJO IZQUIERDO
-          renderer.setViewport(0, 0, w/2, h);
-          renderer.setScissor(0, 0, w/2, h);
-          renderer.render(sceneEl.object3D, self.leftCam);
-          // OJO DERECHO
-          renderer.setViewport(w/2, 0, w/2, h);
-          renderer.setScissor(w/2, 0, w/2, h);
-          renderer.render(sceneEl.object3D, self.rightCam);
-
-          window.requestAnimationFrame(renderLoop);
-        }
-        window.requestAnimationFrame(renderLoop);
-        st('split SBS activo');
+          renderer.setViewport(0,0,w/2,h);
+          renderer.setScissor(0,0,w/2,h);
+          renderer.render(sceneEl.object3D, this.leftCam);
+          renderer.setViewport(w/2,0,w/2,h);
+          renderer.setScissor(w/2,0,w/2,h);
+          renderer.render(sceneEl.object3D, this.rightCam);
+        };
+        renderer.setAnimationLoop(loop);
+        st('✅ Split SBS activo');
       }
     });
 
-    // --- Carga de imagen y utilidades ---
-    const file = document.getElementById('file');
-    const sky = document.getElementById('sky');
-    const fovEl = document.getElementById('fov');
-    const fovVal = document.getElementById('fovVal');
-    const yawEl = document.getElementById('yaw');
-    const yawVal = document.getElementById('yawVal');
-    const rigEl = document.getElementById('rig');
-    const camEl = document.getElementById('camera');
-
-    file.addEventListener('change', ()=>{
-      const imgFile = file.files && file.files[0];
-      if (!imgFile) return;
-      
-      const url = URL.createObjectURL(imgFile);
-      const panoImgEl = document.getElementById('pano');
-      panoImgEl.src = url; // Asigna la URL al <img> de assets
-
-      const tmp = new Image();
-      tmp.onload = ()=>{
-        const ratio = tmp.width / tmp.height;
-        if (Math.abs(ratio-2.0) > 0.1) st(`⚠️ no parece 2:1 (${tmp.width}×${tmp.height}), igual cargamos`);
-        
-        // CORRECCIÓN 3: Usa el ID de la asset (#pano) para que la textura sea visible
-        sky.setAttribute('src', '#pano'); 
-        
-        st('textura 360 aplicada');
-      };
-      tmp.onerror = ()=> st('❌ no se pudo leer la imagen');
-      tmp.src = url;
-    });
-
-    // FOV/Yaw
-    function applyFov(){ 
-      fovVal.textContent = fovEl.value + '°'; 
-      // Pasar un objeto a setAttribute para actualizar solo el FOV del componente
-      rigEl.setAttribute('cardboard-split', { ipd: 0.064, fov: parseFloat(fovEl.value) });
+    // 2) Downscale en móvil: redimensiona a máx 4096×2048 antes de aplicar (evita negro por memoria)
+    function downscaleImageToCanvas(img, maxW=4096){
+      const ratio = img.width / img.height; // debe ~2:1
+      const targetW = Math.min(maxW, img.width);
+      const targetH = Math.round(targetW / ratio);
+      const c = document.createElement('canvas');
+      c.width = targetW; c.height = targetH;
+      const ctx = c.getContext('2d');
+      ctx.drawImage(img, 0, 0, targetW, targetH);
+      return c;
     }
-    function applyYaw(){ yawVal.textContent = yawEl.value + '°'; rigEl.object3D.rotation.y = THREE.MathUtils.degToRad(parseInt(yawEl.value,10)); }
-    fovEl.addEventListener('input', applyFov); applyFov();
-    yawEl.addEventListener('input', applyYaw); applyYaw();
 
-    // Giroscopio
-    async function enableGyro(){
-      try{
-        const dom = window.DeviceMotionEvent; const doe = window.DeviceOrientationEvent;
-        if (dom && typeof dom.requestPermission === 'function') { await dom.requestPermission(); }
-        if (doe && typeof doe.requestPermission === 'function') { await doe.requestPermission(); }
-        st('giroscopio habilitado');
-        try{ await screen.orientation.lock('landscape'); }catch(_){ }
-      }catch(e){ st('⚠️ no se pudo habilitar gyro: '+e.message); }
+    // 3) Cargar imagen y setear como textura via Three (más fiable en Android)
+    function setSkyFromCanvas(canvas){
+      const sky = document.getElementById('sky');
+      const mesh = sky.getObject3D('mesh');
+      if (!mesh) { st('⚠️ mesh de sky no listo'); return; }
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.minFilter = THREE.LinearFilter;
+      tex.magFilter = THREE.LinearFilter;
+      mesh.material.map = tex;
+      mesh.material.side = THREE.BackSide;
+      mesh.material.needsUpdate = true;
+      st('🖼️ textura 360 aplicada (canvas)');
     }
-    document.getElementById('gyroBtn').addEventListener('click', enableGyro);
 
-    // Pantalla completa y reset
-    document.getElementById('fsBtn').addEventListener('click', async ()=>{
-      try{ if(!document.fullscreenElement){ await document.documentElement.requestFullscreen(); st('pantalla completa'); } else { await document.exitFullscreen(); st('salió de pantalla completa'); } }catch(e){ alert('No se pudo entrar a pantalla completa: '+e.message); }
-    });
-    document.getElementById('resetBtn').addEventListener('click', ()=>{
-      rigEl.object3D.rotation.set(0,0,0); yawEl.value=0; yawVal.textContent='0°'; st('vista reiniciada');
-      const lc = camEl.components['look-controls']; if (lc && lc.pitchObject && lc.yawObject){ lc.pitchObject.rotation.x=0; lc.yawObject.rotation.y=0; }
-    });
+    // 4) Inicialización cuando la escena esté lista
+    const sceneEl = document.getElementById('scene');
+    function onReady(){
+      st('escena cargada');
+      // Añadir componente SBS al rig
+      const rig = document.getElementById('rig');
+      rig.setAttribute('cardboard-sbs', 'ipd:0.064; fov:80');
 
-    st('listo: carga imagen 2:1, pulsa Habilitar giroscopio y pantalla completa');
+      // Inputs
+      const file = document.getElementById('file');
+      const fovEl = document.getElementById('fov');
+      const fovVal = document.getElementById('fovVal');
+      const yawEl = document.getElementById('yaw');
+      const yawVal = document.getElementById('yawVal');
+
+      file.addEventListener('change', ()=>{
+        const f = file.files && file.files[0]; if(!f) return;
+        if (!/^image\/(jpeg|png)$/i.test(f.type)) { st('❌ solo JPG/PNG'); return; }
+        const url = URL.createObjectURL(f);
+        const img = new Image();
+        img.onload = ()=>{
+          // Downscale para móviles
+          const canvas = downscaleImageToCanvas(img, 4096);
+          setSkyFromCanvas(canvas);
+        };
+        img.onerror = ()=> st('❌ no se pudo leer la imagen');
+        img.src = url;
+      });
+
+      function applyFov(){ fovVal.textContent = fovEl.value + '°'; const c = rig.getAttribute('cardboard-sbs'); rig.setAttribute('cardboard-sbs', `ipd:${c.ipd}; fov:${parseFloat(fovEl.value)}`); }
+      function applyYaw(){ yawVal.textContent = yawEl.value + '°'; rig.object3D.rotation.y = THREE.MathUtils.degToRad(parseInt(yawEl.value,10)); }
+      fovEl.addEventListener('input', applyFov); applyFov();
+      yawEl.addEventListener('input', applyYaw); applyYaw();
+
+      document.getElementById('gyroBtn').addEventListener('click', async ()=>{
+        try{
+          const dom = window.DeviceMotionEvent; const doe = window.DeviceOrientationEvent;
+          if (dom && typeof dom.requestPermission === 'function') await dom.requestPermission();
+          if (doe && typeof doe.requestPermission === 'function') await doe.requestPermission();
+          try{ await screen.orientation.lock('landscape'); }catch(_){ }
+          st('giroscopio habilitado');
+        }catch(e){ st('⚠️ no se pudo habilitar gyro: '+e.message); }
+      });
+
+      document.getElementById('fsBtn').addEventListener('click', async ()=>{
+        try{ if(!document.fullscreenElement){ await document.documentElement.requestFullscreen(); st('pantalla completa'); } else { await document.exitFullscreen(); st('salió de pantalla completa'); } }catch(e){ alert('No se pudo entrar a pantalla completa: '+e.message); }
+      });
+      document.getElementById('resetBtn').addEventListener('click', ()=>{
+        rig.object3D.rotation.set(0,0,0); yawEl.value=0; yawVal.textContent='0°'; st('vista reiniciada');
+      });
+    }
+    if (sceneEl.hasLoaded) onReady(); else sceneEl.addEventListener('loaded', onReady);
+  })();
   </script>
 </body>
 </html>
