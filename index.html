@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>777Cardboard 360 con A‑Frame (SBS + Gyro) — FIX móvil</title>
+  <title>888Cardboard 360 con A‑Frame (SBS + Gyro) — FIX móvil</title>
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <style>
     html, body { margin:0; height:100%; background:#000; color:#fff; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif; }
@@ -22,12 +22,11 @@
 <body>
   <div id="status">Estado: <span id="st">inicializando…</span></div>
 
-  <a-scene id="scene" renderer="antialias: true; colorManagement: true; toneMappingExposure: 1.7" vr-mode-ui="enabled: false">
+  <a-scene id="scene" renderer="antialias: true; colorManagement: true" vr-mode-ui="enabled: false">
     <a-entity id="rig">
       <a-entity id="camera" camera="active:false; fov:80" look-controls="magicWindowTrackingEnabled:true; touchEnabled:true; mouseEnabled:true" position="0 1.6 0"></a-entity>
     </a-entity>
-    <a-entity light="type: ambient; color: #ffffff; intensity: 1.3"></a-entity>
-    <a-sky id="sky" color="#222" radius="5000" material="shader: flat; side: back; emissive: #ffffff; emissiveIntensity: 1.4"></a-sky></a-sky>
+    <a-sky id="sky" color="#222" radius="5000" material="shader: flat; side: back"></a-sky>
   </a-scene>
 
   <div id="ui">
@@ -44,9 +43,10 @@
       <label>Yaw</label>
       <input id="yaw" type="range" min="-180" max="180" step="1" value="0" />
       <span id="yawVal">0°</span>
-        <div class="row">
-      <label>Exposición</label>
-      <input id="expo" type
+    </div>
+  </div>
+
+  <script>
   (function(){
     const st = (t)=>{ const el=document.getElementById('st'); if (el) el.textContent=t; console.log('[A‑Frame SBS]', t); };
 
