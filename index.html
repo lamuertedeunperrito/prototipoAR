@@ -1,64 +1,8 @@
-<!doctype html>
-<html lang="es">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>Cardboard 360 con A‑Frame (SBS + Gyro) — Imagen y Video</title>
-  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-  <style>
-    html, body { margin:0; height:100%; background:#000; color:#fff; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif; }
-    a-scene { width:100vw; height:100vh; }
-    #ui { position: fixed; inset: auto 0 0 0; background: linear-gradient(transparent, rgba(0,0,0,.75)); padding: 10px 12px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; z-index: 10; }
-    .row { display:flex; align-items:center; gap:6px; }
-    input[type="range"] { width: 140px; }
-    #status { position: fixed; right: 8px; bottom: 70px; background: rgba(0,0,0,.55); padding:6px 8px; border-radius:8px; font-size:12px; z-index: 10; }
-    /* ACEPTA MÚLTIPLES TIPOS DE ARCHIVO */
-    #file { appearance:none; background:#111; color:#fff; border:1px solid #333; border-radius:10px; padding:8px; }
-    button { background:#0a84ff; border:none; color:#fff; padding:10px 12px; border-radius:10px; font-weight:600; }
-    #fsBtn { background:#14b8a6; }
-    #resetBtn { background:#f59e0b; }
-    #gyroBtn { background:#7c3aed; }
-  </style>
-</head>
-<body>
-    <video id="video-asset" loop autoplay playsinline muted style="display:none;"></video>
-
-  <div id="status">Estado: <span id="st">inicializando…</span></div>
-
-  <a-scene id="scene" renderer="antialias: true; colorManagement: false; gammaOutput: false" vr-mode-ui="enabled: false">
-    <a-entity id="rig">
-      <a-entity id="camera" camera="active:false; fov:80" look-controls="magicWindowTrackingEnabled:true; touchEnabled:true; mouseEnabled:true" position="0 1.6 0"></a-entity>
-    </a-entity>
-        <a-entity id="sky" geometry="primitive: sphere; radius: 5000; segmentsWidth: 64; segmentsHeight: 64" material="shader: flat; side: back; color: #222"></a-entity>
-  </a-scene>
-
-  <div id="ui">
-        <input id="file" type="file" accept="image/jpeg,image/png,video/mp4,video/webm" />
-    <button id="gyroBtn">🧭 Habilitar giroscopio</button>
-    <button id="fsBtn">⤢ Pantalla completa</button>
-    <button id="resetBtn">↺ Reset vista</button>
-    <div class="row">
-      <label>FOV</label>
-      <input id="fov" type="range" min="40" max="110" step="1" value="80" />
-      <span id="fovVal">80°</span>
-    </div>
-    <div class="row">
-      <label>Yaw</label>
-      <input id="yaw" type="range" min="-180" max="180" step="1" value="0" />
-      <span id="yawVal">0°</span>
-    </div>
-    <div class="row">
-      <label>Brillo</label>
-      <input id="brightness" type="range" min="50" max="200" step="10" value="100" />
-      <span id="brightnessVal">100%</span>
-    </div>
-  </div>
-
-  <script>
+<script>
   (function(){
     const st = (t)=>{ const el=document.getElementById('st'); if (el) el.textContent=t; console.log('[A‑Frame SBS]', t); };
 
-    // 1) Componente: render SBS controlando el bucle del renderer de A‑Frame (sin cambios)
+    // 1) Componente: render SBS (sin cambios)
     AFRAME.registerComponent('cardboard-sbs', {
       schema: { ipd:{type:'number', default:0.064}, fov:{type:'number', default:80} },
       init(){
@@ -131,17 +75,17 @@
       }
     }
 
-    // 3) Lógica de Carga UNIFICADA (IMAGEN o VIDEO)
+    // 3) Lógica de Carga UNIFICADA (IMAGEN o VIDEO) - INICIO
     const sceneEl = document.getElementById('scene');
-    const videoAsset = document.getElementById('video-asset'); // Referencia al elemento <video>
     
     function onReady(){
       st('escena cargada');
       const rig = document.getElementById('rig');
       rig.setAttribute('cardboard-sbs', 'ipd:0.064; fov:80');
 
-      // ... Referencias a controles de UI ...
+      // REFERENCIAS A ELEMENTOS HTML
       const file = document.getElementById('file');
+      const videoAsset = document.getElementById('video-asset'); // <--- ¡Aseguramos que se referencia aquí!
       const fovEl = document.getElementById('fov');
       const fovVal = document.getElementById('fovVal');
       const yawEl = document.getElementById('yaw');
@@ -168,6 +112,9 @@
         
         // Manejo de IMAGEN
         if (isImage) {
+          // Detener el video si estaba reproduciéndose
+          videoAsset.pause();
+          
           const img = new Image();
           img.onload = ()=>{
             const canvas = downscaleImageToCanvas(img, 4096);
@@ -192,13 +139,15 @@
 
         // Manejo de VIDEO
         } else if (isVideo) {
-          // Asigna la URL y comienza la reproducción (el 'muted' es esencial en móvil)
+          // Asigna la URL y comienza la reproducción
           videoAsset.src = url;
           videoAsset.load();
+          
+          // Reproducir inmediatamente (requiere 'muted' en HTML para móvil)
           videoAsset.play().then(() => {
             st('▶️ video 360 cargado y reproduciendo');
           }).catch(e => {
-            st('⚠️ Error: Se requiere interacción (tocar pantalla) para reproducir el video.');
+            st('⚠️ Error: Toca la pantalla para reproducir el video.');
           });
           
           // Crea la textura a partir del elemento de video HTML
@@ -219,7 +168,7 @@
         }
       });
 
-      // ... el resto del código de los controles de UI (FOV, Yaw, Brillo, Gyro) va aquí ...
+      // ... CÓDIGO DE CONTROLES (SIN CAMBIOS) ...
       function applyFov(){ 
         fovVal.textContent = fovEl.value + '°'; 
         const c = rig.getAttribute('cardboard-sbs'); 
@@ -278,5 +227,3 @@
     if (sceneEl.hasLoaded) onReady(); else sceneEl.addEventListener('loaded', onReady);
   })();
   </script>
-</body>
-</html>
